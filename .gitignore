@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets
+.env
+.env.*
+
+# Telethon session / local database
+*.session
+*.session-journal
+bot_data.db
+*.db
+
+# OS
+Thumbs.db
+Desktop.ini
