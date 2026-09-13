@@ -117,6 +117,7 @@
       <app-system-status
         *ngIf="activeSection() === 'system'"
         [status]="status()"
+        (statusChanged)="refreshAll()"
       ></app-system-status>
     </main>
   </div>

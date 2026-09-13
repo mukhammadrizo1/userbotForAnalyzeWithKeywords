@@ -93,4 +93,28 @@ export class ApiService {
   ping(): Observable<any> {
     return this.http.get<any>(`${this.base}/ping`);
   }
+
+  sendTelegramCode(phone: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/telegram/send-code`, { phone });
+  }
+
+  verifyTelegramCode(phone: string, code: string, phoneCodeHash: string, password?: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/telegram/verify-code`, { phone, code, phoneCodeHash, password });
+  }
+
+  disconnectTelegram(): Observable<any> {
+    return this.http.post<any>(`${this.base}/telegram/disconnect`, {});
+  }
+
+  reconnectTelegram(): Observable<any> {
+    return this.http.post<any>(`${this.base}/telegram/reconnect`, {});
+  }
+
+  getTelegramSyncStatus(): Observable<any> {
+    return this.http.get<any>(`${this.base}/telegram/sync-status`);
+  }
+
+  autoJoinTelegramChannels(): Observable<any> {
+    return this.http.post<any>(`${this.base}/telegram/auto-join`, {});
+  }
 }

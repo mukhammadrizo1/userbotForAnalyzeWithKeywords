@@ -14,6 +14,7 @@ export class UserbotService implements OnModuleInit {
   private isConnected = false;
   private botInfo: any = null;
   private startTime = Date.now();
+  private authClients: Map<string, any> = new Map();
 
   constructor(private readonly db: DatabaseService) {}
 
@@ -39,29 +40,51 @@ export class UserbotService implements OnModuleInit {
       .filter((c) => c !== null);
   }
 
-
   private async initTelegram() {
     const apiIdStr = process.env.TELEGRAM_API_ID;
     const apiHash = process.env.TELEGRAM_API_HASH;
-    const sessionStr = process.env.TELEGRAM_STRING_SESSION;
 
-    if (!apiIdStr || !apiHash || !sessionStr) {
+    if (!apiIdStr || !apiHash) {
       return;
     }
 
     const apiId = parseInt(apiIdStr, 10);
     if (isNaN(apiId)) return;
 
+    let sessionStr = await this.db.getSetting('telegram_session');
+    if (!sessionStr) {
+      sessionStr = process.env.TELEGRAM_STRING_SESSION || '';
+    }
+
+    if (!sessionStr || !sessionStr.trim()) {
+      this.isConnected = false;
+      this.botInfo = null;
+      return;
+    }
+
     try {
+      if (this.client) {
+        try {
+          await this.client.disconnect();
+        } catch {}
+        this.client = null;
+      }
+
       const session = new StringSession(sessionStr.trim());
       await session.load();
 
       this.client = new TelegramClient(session, apiId, apiHash.trim(), {
-        connectionRetries: 5,
+        connectionRetries: 3,
       });
 
       await this.client.connect();
       const me = await this.client.getMe();
+      if (!me) {
+        this.isConnected = false;
+        this.botInfo = null;
+        return;
+      }
+
       this.botInfo = {
         id: me?.id ? me.id.toString() : null,
         firstName: me?.firstName || '',
@@ -73,7 +96,9 @@ export class UserbotService implements OnModuleInit {
 
       this.registerHandlers();
     } catch (err: any) {
+      console.error('Telegram ulanish xatosi:', err?.message || err);
       this.isConnected = false;
+      this.botInfo = null;
     }
   }
 
@@ -90,7 +115,7 @@ export class UserbotService implements OnModuleInit {
         }
 
         await this.handleIncomingMessage(event);
-      } catch {}
+      } catch { }
     }, new NewMessage({}));
   }
 
@@ -312,7 +337,7 @@ export class UserbotService implements OnModuleInit {
             linkPreview: false,
           });
         }
-      } catch {}
+      } catch { }
     }
 
     await this.db.markAsSent(uniqueId, text.slice(0, 500), analyzeResult, channelName, 'SENT');
@@ -383,6 +408,258 @@ Javob faqat bitta so'z bo'lsin.`;
       groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
       stats: counts,
+    };
+  }
+
+  async sendAuthCode(phone: string): Promise<any> {
+    const apiIdStr = process.env.TELEGRAM_API_ID;
+    const apiHash = process.env.TELEGRAM_API_HASH;
+    if (!apiIdStr || !apiHash) {
+      throw new Error('TELEGRAM_API_ID yoki TELEGRAM_API_HASH topilmadi');
+    }
+    const apiId = parseInt(apiIdStr, 10);
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').trim();
+
+    const authClient = new TelegramClient(new StringSession(''), apiId, apiHash.trim(), {
+      connectionRetries: 5,
+    });
+    await authClient.connect();
+
+    const res = await authClient.sendCode(
+      { apiId, apiHash: apiHash.trim() },
+      cleanPhone,
+    );
+
+    this.authClients.set(cleanPhone, {
+      client: authClient,
+      phoneCodeHash: res.phoneCodeHash,
+      createdAt: Date.now(),
+    });
+
+    return {
+      phone: cleanPhone,
+      phoneCodeHash: res.phoneCodeHash,
+    };
+  }
+
+  async verifyAuthCode(phone: string, code: string, phoneCodeHash: string, password?: string): Promise<any> {
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').trim();
+    const entry = this.authClients.get(cleanPhone);
+    let authClient = entry?.client;
+
+    if (!authClient) {
+      const apiIdStr = process.env.TELEGRAM_API_ID;
+      const apiHash = process.env.TELEGRAM_API_HASH;
+      if (!apiIdStr || !apiHash) {
+        throw new Error('TELEGRAM_API_ID yoki TELEGRAM_API_HASH topilmadi');
+      }
+      const apiId = parseInt(apiIdStr, 10);
+      authClient = new TelegramClient(new StringSession(''), apiId, apiHash.trim(), {
+        connectionRetries: 5,
+      });
+      await authClient.connect();
+    }
+
+    try {
+      await authClient.signIn({
+        phoneNumber: cleanPhone,
+        phoneCodeHash: phoneCodeHash || entry?.phoneCodeHash,
+        phoneCode: code.trim(),
+      });
+    } catch (err: any) {
+      if (err.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+        if (!password) {
+          return { needPassword: true };
+        }
+        await authClient.signInWithPassword({
+          password: password.trim(),
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    const sessionString = authClient.session.save();
+    this.authClients.delete(cleanPhone);
+
+    await this.db.setSetting('telegram_session', sessionString);
+    await this.initTelegram();
+
+    return {
+      success: true,
+      connected: this.isConnected,
+      botUser: this.botInfo,
+    };
+  }
+
+  async disconnectBot(): Promise<any> {
+    if (this.client) {
+      try {
+        await this.client.disconnect();
+      } catch {}
+      this.client = null;
+    }
+    this.isConnected = false;
+    this.botInfo = null;
+    await this.db.deleteSetting('telegram_session');
+    return { success: true };
+  }
+
+  async reconnectBot(): Promise<any> {
+    await this.initTelegram();
+    return this.getStatus();
+  }
+
+  async checkChannelsSync(): Promise<any> {
+    const dbChannels = await this.db.getChannels();
+    const dbGroups = await this.db.getGroups();
+
+    if (!this.client || !this.isConnected) {
+      return {
+        connected: false,
+        totalChannels: dbChannels.length,
+        joinedChannels: 0,
+        missingChannels: dbChannels,
+        totalGroups: dbGroups.length,
+        joinedGroups: 0,
+        missingGroups: dbGroups,
+      };
+    }
+
+    try {
+      const dialogs = await this.client.getDialogs({});
+      const joinedUsernamesOrIds = new Set<string>();
+
+      for (const d of dialogs) {
+        if (d.entity) {
+          if (d.entity.username) {
+            joinedUsernamesOrIds.add(d.entity.username.toLowerCase());
+          }
+          if (d.entity.id) {
+            const strId = d.entity.id.toString();
+            joinedUsernamesOrIds.add(strId);
+            joinedUsernamesOrIds.add(`-100${strId}`);
+            joinedUsernamesOrIds.add(`-${strId}`);
+          }
+        }
+        if (d.id) {
+          const strId = d.id.toString();
+          joinedUsernamesOrIds.add(strId);
+          joinedUsernamesOrIds.add(`-100${strId}`);
+          joinedUsernamesOrIds.add(`-${strId}`);
+        }
+      }
+
+      const missingChannels = dbChannels.filter((ch: string) => {
+        const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+        return !joinedUsernamesOrIds.has(clean);
+      });
+
+      const missingGroups = dbGroups.filter((gr: any) => {
+        const id = gr.group_id.toString().trim();
+        return !joinedUsernamesOrIds.has(id);
+      });
+
+      return {
+        connected: true,
+        totalChannels: dbChannels.length,
+        joinedChannels: dbChannels.length - missingChannels.length,
+        missingChannels,
+        totalGroups: dbGroups.length,
+        joinedGroups: dbGroups.length - missingGroups.length,
+        missingGroups,
+      };
+    } catch (err: any) {
+      return {
+        connected: this.isConnected,
+        error: err?.message || 'Dialoglarni yuklashda xatolik',
+        totalChannels: dbChannels.length,
+        joinedChannels: 0,
+        missingChannels: dbChannels,
+        totalGroups: dbGroups.length,
+        joinedGroups: 0,
+        missingGroups: dbGroups,
+      };
+    }
+  }
+
+  private getRandomDelay(min: number = 3500, max: number = 6500): Promise<void> {
+    const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+    return new Promise((r) => setTimeout(r, delay));
+  }
+
+  async autoJoinChannels(): Promise<any> {
+    if (!this.client || !this.isConnected) {
+      throw new Error('Telegram mijoz faol emas');
+    }
+
+    const sync = await this.checkChannelsSync();
+    const channelsToJoin = sync.missingChannels || [];
+    const groupsToJoin = sync.missingGroups || [];
+
+    const results: any[] = [];
+    let successCount = 0;
+    let failCount = 0;
+    let totalProcessed = 0;
+
+    for (const ch of channelsToJoin) {
+      const clean = ch.replace('https://t.me/', '').replace('@', '').trim();
+      try {
+        const entity = await this.client.getEntity(clean);
+        await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
+        successCount++;
+        results.push({ item: ch, status: 'success' });
+      } catch (err: any) {
+        failCount++;
+        const errMsg = err?.errorMessage || err?.message || 'Xatolik';
+        results.push({ item: ch, status: 'error', error: errMsg });
+        if (err?.seconds || errMsg.includes('FLOOD_WAIT')) {
+          const waitSec = err?.seconds || 30;
+          await new Promise((r) => setTimeout(r, Math.min(waitSec * 1000, 60000)));
+        }
+      }
+
+      totalProcessed++;
+      if (totalProcessed % 10 === 0) {
+        await this.getRandomDelay(12000, 18000);
+      } else {
+        await this.getRandomDelay(3500, 6500);
+      }
+    }
+
+    for (const gr of groupsToJoin) {
+      const id = gr.group_id.trim();
+      try {
+        const entity = await this.client.getEntity(id);
+        await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
+        successCount++;
+        results.push({ item: id, status: 'success' });
+      } catch (err: any) {
+        failCount++;
+        const errMsg = err?.errorMessage || err?.message || 'Xatolik';
+        results.push({ item: id, status: 'error', error: errMsg });
+        if (err?.seconds || errMsg.includes('FLOOD_WAIT')) {
+          const waitSec = err?.seconds || 30;
+          await new Promise((r) => setTimeout(r, Math.min(waitSec * 1000, 60000)));
+        }
+      }
+
+      totalProcessed++;
+      if (totalProcessed % 10 === 0) {
+        await this.getRandomDelay(12000, 18000);
+      } else {
+        await this.getRandomDelay(3500, 6500);
+      }
+    }
+
+    const newSync = await this.checkChannelsSync();
+
+    return {
+      success: true,
+      joined: successCount,
+      failed: failCount,
+      results,
+      sync: newSync,
     };
   }
 }

@@ -134,4 +134,40 @@ export class ApiController {
     const ok = await this.db.clearHistory();
     return { success: ok };
   }
+
+  @UseGuards(AuthGuard)
+  @Post('telegram/send-code')
+  async sendTelegramCode(@Body() body: any): Promise<any> {
+    return this.userbot.sendAuthCode(body.phone);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('telegram/verify-code')
+  async verifyTelegramCode(@Body() body: any): Promise<any> {
+    return this.userbot.verifyAuthCode(body.phone, body.code, body.phoneCodeHash, body.password);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('telegram/disconnect')
+  async disconnectTelegram(): Promise<any> {
+    return this.userbot.disconnectBot();
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('telegram/reconnect')
+  async reconnectTelegram(): Promise<any> {
+    return this.userbot.reconnectBot();
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('telegram/sync-status')
+  async getTelegramSyncStatus(): Promise<any> {
+    return this.userbot.checkChannelsSync();
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('telegram/auto-join')
+  async autoJoinTelegramChannels(): Promise<any> {
+    return this.userbot.autoJoinChannels();
+  }
 }

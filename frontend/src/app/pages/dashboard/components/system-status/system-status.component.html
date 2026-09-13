@@ -2,15 +2,27 @@
   <div class="view-header">
     <div>
       <h2 class="view-title">Tizim & Userbot Holati</h2>
-      <p class="view-subtitle">Telegram hisobi, Groq AI va ma'lumotlar bazasi integratsiyasi</p>
+      <p class="view-subtitle">Telegram hisobi, Groq AI va kanallar sinxronizatsiyasi boshqaruvi</p>
     </div>
-    <span
-      hlmBadge
-      [variant]="status?.connected ? 'success' : 'warning'"
-      class="status-pill"
-    >
-      {{ status?.connected ? 'Online (Faol)' : 'Kutish rejimida' }}
-    </span>
+    <div class="header-actions">
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        (click)="reconnect()"
+        [disabled]="reconnecting()"
+        class="gap-1.5"
+      >
+        <svg class="w-4 h-4 text-slate-300" [class.animate-spin]="reconnecting()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>{{ reconnecting() ? 'Ulanmoqda...' : 'Qayta ulanish' }}</span>
+      </button>
+
+      <span hlmBadge [variant]="status?.connected ? 'success' : 'warning'" class="status-pill">
+        {{ status?.connected ? 'Online (Faol)' : 'Kutish rejimida' }}
+      </span>
+    </div>
   </div>
 
   <div class="cards-grid">
@@ -18,21 +30,26 @@
       <div class="card-top">
         <div class="icon-circle blue">
           <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-        <h3 class="card-heading">Telegram Userbot Hisobi</h3>
+        <div class="card-heading-box">
+          <h3 class="card-heading">Telegram Userbot Hisobi</h3>
+          <p class="card-subheading">Xabarlarni tinglovchi va yo'naltiruvchi faol sessiya</p>
+        </div>
       </div>
+
       <div class="info-rows">
         <div class="info-row">
           <span class="label">Holati:</span>
           <span class="value" [class.text-emerald-400]="status?.connected" [class.text-amber-400]="!status?.connected">
-            {{ status?.connected ? 'Ulangan (Online)' : 'Ulanmagan' }}
+            {{ status?.connected ? 'Ulangan (Online)' : 'Ulanmagan (Offline)' }}
           </span>
         </div>
         <div class="info-row">
           <span class="label">Ism:</span>
-          <span class="value">{{ status?.botUser?.firstName || 'UTY Monitor' }}</span>
+          <span class="value">{{ status?.botUser?.firstName ? (status?.botUser?.firstName + ' ' + (status?.botUser?.lastName || '')) : (status?.connected ? 'UTY Monitor' : '-') }}</span>
         </div>
         <div class="info-row">
           <span class="label">Username:</span>
@@ -40,12 +57,164 @@
         </div>
         <div class="info-row">
           <span class="label">Telefon:</span>
-          <span class="value font-mono">{{ status?.botUser?.phone || '-' }}</span>
+          <span class="value font-mono">{{ status?.botUser?.phone ? ('+' + status?.botUser?.phone) : '-' }}</span>
         </div>
         <div class="info-row">
           <span class="label">Ishlash Vaqti (Uptime):</span>
           <span class="value">{{ formatUptime(status?.uptimeSeconds) }}</span>
         </div>
+      </div>
+
+      <div class="card-actions">
+        <button
+          *ngIf="!status?.connected"
+          hlmBtn
+          variant="default"
+          size="sm"
+          (click)="openConnectModal()"
+          class="w-full gap-2"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          <span>Telegram Hisob Ulash</span>
+        </button>
+
+        <div *ngIf="status?.connected" class="action-btn-group">
+          <button
+            hlmBtn
+            variant="outline"
+            size="sm"
+            (click)="openConnectModal()"
+            class="flex-1 gap-1.5"
+          >
+            <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+            <span>Boshqa akkaunt ulash</span>
+          </button>
+          <button
+            hlmBtn
+            variant="destructive"
+            size="sm"
+            (click)="openDisconnectModal()"
+            [disabled]="disconnecting()"
+            class="gap-1.5"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            <span>Uzish</span>
+          </button>
+        </div>
+      </div>
+    </hlm-card>
+
+    <hlm-card class="status-card">
+      <div class="card-top">
+        <div class="icon-circle emerald">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <div class="card-heading-box">
+          <h3 class="card-heading">Kanal & Guruh A'zoligi</h3>
+          <p class="card-subheading">Bazadagi manbalarga akkauntning ulanganligi</p>
+        </div>
+      </div>
+
+      <div class="info-rows">
+        <div class="sync-stat-box">
+          <div class="sync-stat-top">
+            <span class="label">Monitoring Kanallari:</span>
+            <span class="value font-mono font-bold">
+              <ng-container *ngIf="status?.connected">
+                {{ syncStatus()?.joinedChannels || 0 }} / {{ syncStatus()?.totalChannels || status?.stats?.channels || 0 }} ta
+              </ng-container>
+              <ng-container *ngIf="!status?.connected">
+                Bazada {{ status?.stats?.channels || 0 }} ta
+              </ng-container>
+            </span>
+          </div>
+          <div class="progress-bar-bg" *ngIf="status?.connected">
+            <div
+              class="progress-bar-fill"
+              [style.width.%]="getChannelSyncPercentage()"
+              [class.bg-emerald-500]="getChannelSyncPercentage() === 100"
+              [class.bg-blue-500]="getChannelSyncPercentage() < 100 && getChannelSyncPercentage() > 0"
+              [class.bg-amber-500]="getChannelSyncPercentage() === 0"
+            ></div>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <span class="label">Yo'naltiruvchi Guruhlar:</span>
+          <span class="value font-mono font-bold">
+            <ng-container *ngIf="status?.connected">
+              {{ syncStatus()?.joinedGroups || 0 }} / {{ syncStatus()?.totalGroups || status?.stats?.groups || 0 }} ta
+            </ng-container>
+            <ng-container *ngIf="!status?.connected">
+              Bazada {{ status?.stats?.groups || 0 }} ta
+            </ng-container>
+          </span>
+        </div>
+
+        <div class="info-row">
+          <span class="label">A'zolik holati:</span>
+          <span class="value" [class.text-emerald-400]="status?.connected && (syncStatus()?.missingChannels?.length || 0) === 0" [class.text-amber-400]="!status?.connected || (syncStatus()?.missingChannels?.length || 0) > 0">
+            <ng-container *ngIf="!status?.connected">
+              Akkaunt ulanmagan
+            </ng-container>
+            <ng-container *ngIf="status?.connected && syncLoading()">
+              Tekshirilmoqda...
+            </ng-container>
+            <ng-container *ngIf="status?.connected && !syncLoading()">
+              {{ (syncStatus()?.missingChannels?.length || 0) === 0 ? 'Barchasiga aʼzo boʻlingan ✅' : ((syncStatus()?.missingChannels?.length || 0) + ' tasiga aʼzo emas') }}
+            </ng-container>
+          </span>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <div class="action-btn-group">
+          <button
+            hlmBtn
+            variant="outline"
+            size="sm"
+            (click)="checkSync()"
+            [disabled]="syncLoading()"
+            class="flex-1 gap-1.5"
+          >
+            <svg class="w-4 h-4 text-slate-400" [class.animate-spin]="syncLoading()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Tekshirish</span>
+          </button>
+
+          <button
+            hlmBtn
+            variant="default"
+            size="sm"
+            (click)="openAutoJoinModal()"
+            [disabled]="autoJoining() || !status?.connected || (syncStatus()?.missingChannels?.length === 0 && syncStatus()?.missingGroups?.length === 0)"
+            class="flex-1 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <svg class="w-4 h-4" [class.animate-spin]="autoJoining()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            </svg>
+            <span>{{ autoJoining() ? 'Aʼzo boʻlinmoqda...' : 'Avtomatik aʼzo boʻlish' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="autoJoinResult()" class="autojoin-result-banner" [class.success]="autoJoinResult()?.success" [class.error]="!autoJoinResult()?.success">
+        <span *ngIf="autoJoinResult()?.success">
+          ✅ Muvaffaqiyatli: {{ autoJoinResult()?.joined }} ta manzilga a'zo bo'lindi ({{ autoJoinResult()?.failed }} ta xatolik).
+        </span>
+        <span *ngIf="!autoJoinResult()?.success">
+          ❌ {{ autoJoinResult()?.error || 'Aʼzo boʻlish jarayonida xatolik yuz berdi' }}
+        </span>
       </div>
     </hlm-card>
 
@@ -53,10 +222,14 @@
       <div class="card-top">
         <div class="icon-circle purple">
           <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
         </div>
-        <h3 class="card-heading">Groq AI (LLM) Konfiguratsiyasi</h3>
+        <div class="card-heading-box">
+          <h3 class="card-heading">Groq AI (LLM) Konfiguratsiyasi</h3>
+          <p class="card-subheading">Postlarni filtrlash va tahlil qilish moduli</p>
+        </div>
       </div>
       <div class="info-rows">
         <div class="info-row">
@@ -85,3 +258,104 @@
     </hlm-card>
   </div>
 </div>
+
+<app-dialog
+  [isOpen]="isConnectModalOpen()"
+  [title]="connectStep() === 1 ? 'Yangi Telegram Hisobini Ulash' : 'Kodni Tasdiqlash'"
+  [description]="connectStep() === 1 ? 'Monitoring uchun Telegram telefon raqamingizni kiriting.' : 'Telegram ilovangizga yuborilgan tasdiqlash kodini kiriting.'"
+  (closed)="closeConnectModal()"
+>
+  <div class="modal-body-content">
+    <div *ngIf="connectError()" class="modal-error-alert">
+      <svg class="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <span>{{ connectError() }}</span>
+    </div>
+
+    <div *ngIf="connectStep() === 1" class="step-form">
+      <div class="form-group">
+        <label class="form-label">Telefon Raqam:</label>
+        <input
+          hlmInput
+          type="tel"
+          placeholder="+998901234567"
+          [value]="phone()"
+          (input)="phone.set($any($event.target).value)"
+          (keydown.enter)="sendCode()"
+        />
+        <p class="form-hint">Xalqaro formatda (+998...) kiriting</p>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button hlmBtn variant="ghost" (click)="closeConnectModal()" [disabled]="connectLoading()">
+          Bekor qilish
+        </button>
+        <button hlmBtn variant="default" (click)="sendCode()" [disabled]="connectLoading()" class="gap-1.5">
+          <span *ngIf="connectLoading()" class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+          <span>{{ connectLoading() ? 'Yuborilmoqda...' : 'Kod olish' }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="connectStep() === 2" class="step-form">
+      <div class="form-group">
+        <label class="form-label">Telegram Tasdiqlash Kodi:</label>
+        <input
+          hlmInput
+          type="text"
+          placeholder="12345"
+          [value]="code()"
+          (input)="code.set($any($event.target).value)"
+          (keydown.enter)="verifyCode()"
+        />
+        <p class="form-hint">Telegram ilovangizga kelgan 5 xonali raqam</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">2FA Paroli (Agar mavjud bo'lsa):</label>
+        <input
+          hlmInput
+          type="password"
+          placeholder="Ikki bosqichli autentifikatsiya paroli"
+          [value]="password()"
+          (input)="password.set($any($event.target).value)"
+          (keydown.enter)="verifyCode()"
+        />
+        <p class="form-hint">Agar akkauntingizda bulutli parol yoqilgan bo'lsa kiriting</p>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button hlmBtn variant="ghost" (click)="connectStep.set(1)" [disabled]="connectLoading()">
+          Orqaga
+        </button>
+        <button hlmBtn variant="default" (click)="verifyCode()" [disabled]="connectLoading()" class="gap-1.5">
+          <span *ngIf="connectLoading()" class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+          <span>{{ connectLoading() ? 'Ulanmoqda...' : 'Tasdiqlash & Ulash' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</app-dialog>
+
+<app-confirm-modal
+  [isOpen]="isDisconnectModalOpen()"
+  title="Telegram Akkauntini Uzish"
+  message="Haqiqatan ham joriy Telegram sessiyasini uzmoqchimisiz? Userbot monitoring vaqtincha to'xtatiladi."
+  confirmText="Hisobni uzish"
+  cancelText="Bekor qilish"
+  variant="destructive"
+  (confirmed)="confirmDisconnect()"
+  (cancelled)="closeDisconnectModal()"
+></app-confirm-modal>
+
+<app-confirm-modal
+  [isOpen]="isAutoJoinModalOpen()"
+  title="Barcha Kanallarga A'zo Bo'lish"
+  message="Ushbu amal bazadagi a'zo bo'linmagan barcha kanallarga navbatma-navbat (Telegram shubhasini oldini olish uchun 3.5 - 6.5 soniyalik tasodifiy pauzalar va har 10 ta kanalda qo'shimcha tanaffus bilan) xavfsiz a'zo bo'ladi. Davom ettirasizmi?"
+  confirmText="A'zo bo'lishni boshlash"
+  cancelText="Bekor qilish"
+  variant="default"
+  (confirmed)="confirmAutoJoin()"
+  (cancelled)="closeAutoJoinModal()"
+></app-confirm-modal>

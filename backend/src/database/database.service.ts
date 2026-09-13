@@ -41,7 +41,27 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         channel TEXT,
         status TEXT
       );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
     `);
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    const res = await this.query('SELECT value FROM settings WHERE key = $1', [key]);
+    return res.rows.length > 0 ? res.rows[0].value : null;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await this.query(
+      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+      [key, value],
+    );
+  }
+
+  async deleteSetting(key: string): Promise<void> {
+    await this.query('DELETE FROM settings WHERE key = $1', [key]);
   }
 
   async query(text: string, params?: any[]): Promise<any> {
