@@ -8,12 +8,10 @@ import { environment } from '../../environments/environment';
 })
 export class ApiService {
   private get base(): string {
-    const custom = localStorage.getItem('backend_url');
-    return `${custom || environment.apiUrl || ''}/api`;
+    return `${environment.apiUrl || ''}/api`;
   }
 
   constructor(private http: HttpClient) {}
-
 
   getStatus(): Observable<any> {
     return this.http.get<any>(`${this.base}/status`);
@@ -27,6 +25,10 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/channels`, { ident });
   }
 
+  updateChannel(oldIdent: string, newIdent: string): Observable<any> {
+    return this.http.put<any>(`${this.base}/channels/${encodeURIComponent(oldIdent)}`, { newIdent });
+  }
+
   deleteChannel(ident: string): Observable<any> {
     return this.http.delete<any>(`${this.base}/channels/${encodeURIComponent(ident)}`);
   }
@@ -37,6 +39,10 @@ export class ApiService {
 
   addKeyword(word: string): Observable<any> {
     return this.http.post<any>(`${this.base}/keywords`, { word });
+  }
+
+  updateKeyword(oldWord: string, newWord: string): Observable<any> {
+    return this.http.put<any>(`${this.base}/keywords/${encodeURIComponent(oldWord)}`, { newWord });
   }
 
   deleteKeyword(word: string): Observable<any> {
@@ -52,6 +58,13 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/groups`, { group_id: groupId, type });
   }
 
+  updateGroup(oldGroupId: string, oldType: string, newGroupId: string, newType: string): Observable<any> {
+    return this.http.put<any>(
+      `${this.base}/groups/${encodeURIComponent(oldType)}/${encodeURIComponent(oldGroupId)}`,
+      { newGroupId, newType },
+    );
+  }
+
   deleteGroup(groupId: string, type: string): Observable<any> {
     return this.http.delete<any>(
       `${this.base}/groups/${encodeURIComponent(type)}/${encodeURIComponent(groupId)}`,
@@ -60,6 +73,14 @@ export class ApiService {
 
   getHistory(limit: number = 50): Observable<any> {
     return this.http.get<any>(`${this.base}/history?limit=${limit}`);
+  }
+
+  deleteHistoryItem(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.base}/history/${encodeURIComponent(id)}`);
+  }
+
+  clearHistory(): Observable<any> {
+    return this.http.delete<any>(`${this.base}/history`);
   }
 
   ping(): Observable<any> {

@@ -1,0 +1,206 @@
+<div class="history-view">
+  <div class="view-header">
+    <div>
+      <h2 class="view-title">Xabarlar Tahlili Tarixi</h2>
+      <p class="view-subtitle">Userbot tomonidan tutilgan va AI tahlil qilgan so'nggi xabarlar jurnali</p>
+    </div>
+    <div class="header-actions">
+      <span hlmBadge variant="secondary" class="total-badge">
+        Jami: {{ _history().length }} ta
+      </span>
+      <button hlmBtn variant="outline" size="sm" (click)="onRefresh()" class="gap-1.5">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>Yangilash</span>
+      </button>
+      <button
+        hlmBtn
+        variant="destructive"
+        size="sm"
+        (click)="promptClearAll()"
+        [disabled]="_history().length === 0"
+        class="gap-1.5"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        <span>Tozalash</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input
+      hlmInput
+      type="text"
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      placeholder="ID, kanal yoki xulosa bo'yicha qidirish..."
+      class="pl-10 w-full"
+    />
+  </div>
+
+  <div class="table-card">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Xabar ID</th>
+          <th>Kanal / Manba</th>
+          <th>AI Xulosasi</th>
+          <th>Holat</th>
+          <th>Sana & Vaqt</th>
+          <th class="text-right">Amallar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let h of filtered()" class="table-row">
+          <td class="id-col" (click)="openDetail(h)">{{ h.msg_unique_id }}</td>
+          <td class="channel-col" (click)="openDetail(h)">{{ h.channel || 'Nomaʼlum' }}</td>
+          <td (click)="openDetail(h)">
+            <span
+              hlmBadge
+              [variant]="
+                h.sentiment === 'YAXSHI'
+                  ? 'success'
+                  : h.sentiment === 'YOMON'
+                  ? 'destructive'
+                  : h.sentiment === 'NEYTRAL'
+                  ? 'warning'
+                  : 'outline'
+              "
+              class="font-semibold"
+            >
+              {{ h.sentiment || 'SAQLANGAN' }}
+            </span>
+          </td>
+          <td class="status-col" (click)="openDetail(h)">{{ h.status || 'OK' }}</td>
+          <td class="date-col" (click)="openDetail(h)">{{ formatDate(h.date_added) }}</td>
+          <td class="actions-col text-right">
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon"
+              (click)="openDetail(h)"
+              title="Batafsil koʻrish"
+              class="btn-row-action view"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon"
+              (click)="promptDelete(h)"
+              title="Oʻchirish"
+              class="btn-row-action trash"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filtered().length === 0">
+          <td colspan="6" class="empty-table">
+            Xabarlar tarixi topilmadi
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <app-dialog
+    [isOpen]="detailModalOpen()"
+    title="Xabar Tahlili Tafsilotlari"
+    description="Telegram post matni va Groq AI xulosasi"
+    maxWidthClass="max-w-2xl"
+    (closed)="detailModalOpen.set(false)"
+  >
+    <div class="detail-container">
+      <div class="detail-grid">
+        <div class="detail-cell">
+          <span class="cell-label">Unikal ID:</span>
+          <span class="cell-value font-mono">{{ selectedItem()?.msg_unique_id }}</span>
+        </div>
+        <div class="detail-cell">
+          <span class="cell-label">Kanal:</span>
+          <span class="cell-value">{{ selectedItem()?.channel || '-' }}</span>
+        </div>
+        <div class="detail-cell">
+          <span class="cell-label">AI Bahosi:</span>
+          <span
+            hlmBadge
+            [variant]="
+              selectedItem()?.sentiment === 'YAXSHI'
+                ? 'success'
+                : selectedItem()?.sentiment === 'YOMON'
+                ? 'destructive'
+                : selectedItem()?.sentiment === 'NEYTRAL'
+                ? 'warning'
+                : 'outline'
+            "
+          >
+            {{ selectedItem()?.sentiment || 'SAQLANGAN' }}
+          </span>
+        </div>
+        <div class="detail-cell">
+          <span class="cell-label">Vaqt:</span>
+          <span class="cell-value">{{ formatDate(selectedItem()?.date_added) }}</span>
+        </div>
+      </div>
+
+      <div class="post-text-box">
+        <div class="post-text-header">
+          <span class="post-title">Post Matni:</span>
+          <button class="copy-btn" (click)="copyText(selectedItem()?.text)">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <span>{{ copied() ? 'Nusxa olindi!' : 'Nusxa olish' }}</span>
+          </button>
+        </div>
+        <div class="post-content">
+          {{ selectedItem()?.text || '(Matn mavjud emas)' }}
+        </div>
+      </div>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="destructive" (click)="promptDelete(selectedItem(), true)">
+        <span>Oʻchirish</span>
+      </button>
+      <button hlmBtn variant="secondary" (click)="detailModalOpen.set(false)">
+        <span>Yopish</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-confirm-modal
+    [isOpen]="confirmModalOpen()"
+    title="Xabarni Oʻchirish"
+    [message]="'Ushbu tahlil qilingan xabarni (' + selectedItem()?.msg_unique_id + ') tarixdan oʻchirmoqchimisiz?'"
+    confirmText="Oʻchirish"
+    cancelText="Bekor qilish"
+    variant="destructive"
+    (confirmed)="confirmDelete()"
+    (cancelled)="confirmModalOpen.set(false)"
+  ></app-confirm-modal>
+
+  <app-confirm-modal
+    [isOpen]="confirmClearAllOpen()"
+    title="Barcha Tarixni Tozalash"
+    message="Haqiqatan ham barcha saqlangan tahlil tarixini tozalab tashlamoqchimisiz? Bu amalni qaytarib boʻlmaydi."
+    confirmText="Tozalash"
+    cancelText="Bekor qilish"
+    variant="destructive"
+    (confirmed)="confirmClear()"
+    (cancelled)="confirmClearAllOpen.set(false)"
+  ></app-confirm-modal>
+</div>

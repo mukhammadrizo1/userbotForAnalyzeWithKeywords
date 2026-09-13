@@ -21,13 +21,10 @@ export class AuthService {
     private router: Router,
   ) {}
 
-  private getBaseUrl(): string {
-    return localStorage.getItem('backend_url') || environment.apiUrl || '';
-  }
-
   login(credentials: any): Observable<any> {
-    const url = `${this.getBaseUrl()}/api/auth/login`;
+    const url = `${environment.apiUrl || ''}/api/auth/login`;
     return this.http.post<any>(url, credentials).pipe(
+
 
       tap((res: any) => {
         if (res && res.access_token) {

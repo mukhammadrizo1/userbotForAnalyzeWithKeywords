@@ -1,12 +1,16 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { ButtonComponent } from '../../components/ui/button/button.component';
 import { BadgeComponent } from '../../components/ui/badge/badge.component';
-import { CardComponent } from '../../components/ui/card/card.component';
-import { InputComponent } from '../../components/ui/input/input.component';
+import { SidebarComponent } from './components/sidebar/sidebar.component';
+import { ChannelsComponent } from './components/channels/channels.component';
+import { KeywordsComponent } from './components/keywords/keywords.component';
+import { GroupsComponent } from './components/groups/groups.component';
+import { HistoryComponent } from './components/history/history.component';
+import { SystemStatusComponent } from './components/system-status/system-status.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -16,70 +20,27 @@ import { InputComponent } from '../../components/ui/input/input.component';
     FormsModule,
     ButtonComponent,
     BadgeComponent,
-    CardComponent,
-    InputComponent,
+    SidebarComponent,
+    ChannelsComponent,
+    KeywordsComponent,
+    GroupsComponent,
+    HistoryComponent,
+    SystemStatusComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })
 export class DashboardComponent implements OnInit {
-
-  activeTab = signal<string>('channels');
+  activeSection = signal<string>('channels');
+  sidebarCollapsed = signal<boolean>(false);
   status = signal<any>(null);
   loading = signal<boolean>(false);
   toast = signal<any>(null);
 
   channels = signal<string[]>([]);
-  channelSearch = signal<string>('');
-  newChannel = signal<string>('');
-
   keywords = signal<string[]>([]);
-  keywordSearch = signal<string>('');
-  newKeyword = signal<string>('');
-
   groups = signal<any[]>([]);
-  newGroupId = signal<string>('');
-  newGroupType = signal<string>('good');
-
   history = signal<any[]>([]);
-  pingData = signal<any>(null);
-  backendUrl = signal<string>(localStorage.getItem('backend_url') || '');
-
-  saveBackendUrl(): void {
-    const val = this.backendUrl().trim().replace(/\/+$/, '');
-    if (val) {
-      localStorage.setItem('backend_url', val);
-    } else {
-      localStorage.removeItem('backend_url');
-    }
-    this.showToast('Backend URL saqlandi', 'success');
-    this.refreshAll();
-  }
-
-
-  readonly filteredChannels = computed(() => {
-    const q = this.channelSearch().toLowerCase().trim();
-    if (!q) return this.channels();
-    return this.channels().filter((ch) => ch.toLowerCase().includes(q));
-  });
-
-  readonly filteredKeywords = computed(() => {
-    const q = this.keywordSearch().toLowerCase().trim();
-    if (!q) return this.keywords();
-    return this.keywords().filter((kw) => kw.toLowerCase().includes(q));
-  });
-
-  readonly goodGroups = computed(() => {
-    return this.groups().filter((g) => g.type === 'good');
-  });
-
-  readonly badGroups = computed(() => {
-    return this.groups().filter((g) => g.type === 'bad');
-  });
-
-  readonly neutralGroups = computed(() => {
-    return this.groups().filter((g) => g.type === 'neutral');
-  });
 
   constructor(
     private api: ApiService,
@@ -90,6 +51,10 @@ export class DashboardComponent implements OnInit {
     this.refreshAll();
   }
 
+  toggleSidebar(): void {
+    this.sidebarCollapsed.set(!this.sidebarCollapsed());
+  }
+
   refreshAll(): void {
     this.loading.set(true);
     this.loadStatus();
@@ -97,7 +62,7 @@ export class DashboardComponent implements OnInit {
     this.loadKeywords();
     this.loadGroups();
     this.loadHistory();
-    setTimeout(() => this.loading.set(false), 500);
+    setTimeout(() => this.loading.set(false), 400);
   }
 
   loadStatus(): void {
@@ -114,14 +79,11 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  addChannel(): void {
-    const val = this.newChannel().trim();
-    if (!val) return;
-    this.api.addChannel(val).subscribe({
+  handleAddChannel(ident: string): void {
+    this.api.addChannel(ident).subscribe({
       next: (res: any) => {
         if (res.success) {
-          this.showToast(`Kanal qo'shildi: ${val}`, 'success');
-          this.newChannel.set('');
+          this.showToast(`Kanal qo'shildi: ${ident}`, 'success');
           this.loadChannels();
           this.loadStatus();
         } else {
@@ -132,8 +94,21 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  deleteChannel(ident: string): void {
-    if (!confirm(`"${ident}" kanalini o'chirishni tasdiqlaysizmi?`)) return;
+  handleUpdateChannel(data: any): void {
+    this.api.updateChannel(data.oldIdent, data.newIdent).subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast(`Kanal yangilandi: ${data.newIdent}`, 'success');
+          this.loadChannels();
+        } else {
+          this.showToast('Kanalni yangilashda xatolik', 'error');
+        }
+      },
+      error: () => this.showToast('Kanalni yangilashda xatolik', 'error'),
+    });
+  }
+
+  handleDeleteChannel(ident: string): void {
     this.api.deleteChannel(ident).subscribe({
       next: (res: any) => {
         if (res.success) {
@@ -153,14 +128,11 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  addKeyword(): void {
-    const val = this.newKeyword().trim();
-    if (!val) return;
-    this.api.addKeyword(val).subscribe({
+  handleAddKeyword(word: string): void {
+    this.api.addKeyword(word).subscribe({
       next: (res: any) => {
         if (res.success) {
-          this.showToast(`Kalit soʻz qo'shildi: ${val}`, 'success');
-          this.newKeyword.set('');
+          this.showToast(`Kalit soʻz qo'shildi: ${word}`, 'success');
           this.loadKeywords();
           this.loadStatus();
         } else {
@@ -171,8 +143,21 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  deleteKeyword(word: string): void {
-    if (!confirm(`"${word}" kalit so'zini o'chirishni tasdiqlaysizmi?`)) return;
+  handleUpdateKeyword(data: any): void {
+    this.api.updateKeyword(data.oldWord, data.newWord).subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast(`Kalit so'z yangilandi: ${data.newWord}`, 'success');
+          this.loadKeywords();
+        } else {
+          this.showToast('Kalit soʻzni yangilashda xatolik', 'error');
+        }
+      },
+      error: () => this.showToast('Kalit soʻzni yangilashda xatolik', 'error'),
+    });
+  }
+
+  handleDeleteKeyword(word: string): void {
     this.api.deleteKeyword(word).subscribe({
       next: (res: any) => {
         if (res.success) {
@@ -192,16 +177,11 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  addGroup(): void {
-    const gId = this.newGroupId().trim();
-    const gType = this.newGroupType();
-    if (!gId) return;
-
-    this.api.addGroup(gId, gType).subscribe({
+  handleAddGroup(data: any): void {
+    this.api.addGroup(data.id, data.type).subscribe({
       next: (res: any) => {
         if (res.success) {
-          this.showToast(`Guruh qo'shildi: ${gId}`, 'success');
-          this.newGroupId.set('');
+          this.showToast(`Guruh qo'shildi: ${data.id}`, 'success');
           this.loadGroups();
           this.loadStatus();
         } else {
@@ -212,12 +192,25 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  deleteGroup(groupId: string, type: string): void {
-    if (!confirm(`"${groupId}" (${type}) guruhini o'chirishni tasdiqlaysizmi?`)) return;
-    this.api.deleteGroup(groupId, type).subscribe({
+  handleUpdateGroup(data: any): void {
+    this.api.updateGroup(data.oldGroupId, data.oldType, data.newGroupId, data.newType).subscribe({
       next: (res: any) => {
         if (res.success) {
-          this.showToast(`Guruh oʻchirildi: ${groupId}`, 'success');
+          this.showToast('Guruh muvaffaqiyatli yangilandi', 'success');
+          this.loadGroups();
+        } else {
+          this.showToast('Guruhni yangilashda xatolik', 'error');
+        }
+      },
+      error: () => this.showToast('Guruhni yangilashda xatolik', 'error'),
+    });
+  }
+
+  handleDeleteGroup(data: any): void {
+    this.api.deleteGroup(data.groupId, data.type).subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast(`Guruh oʻchirildi: ${data.groupId}`, 'success');
           this.loadGroups();
           this.loadStatus();
         }
@@ -233,13 +226,29 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  testPing(): void {
-    this.api.ping().subscribe({
-      next: (data: any) => {
-        this.pingData.set(data);
-        this.showToast('Ping muvaffaqiyatli: ' + data.status, 'success');
+  handleDeleteHistoryItem(id: string): void {
+    this.api.deleteHistoryItem(id).subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast('Xabar tarixdan oʻchirildi', 'success');
+          this.loadHistory();
+          this.loadStatus();
+        }
       },
-      error: () => this.showToast('Ping xatolik berdi', 'error'),
+      error: () => this.showToast('Xabarni oʻchirishda xatolik', 'error'),
+    });
+  }
+
+  handleClearHistory(): void {
+    this.api.clearHistory().subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast('Barcha xabarlar tarixi tozalandi', 'success');
+          this.loadHistory();
+          this.loadStatus();
+        }
+      },
+      error: () => this.showToast('Tarixni tozalashda xatolik', 'error'),
     });
   }
 
@@ -252,32 +261,5 @@ export class DashboardComponent implements OnInit {
 
   logout(): void {
     this.auth.logout();
-  }
-
-  formatUptime(seconds: number): string {
-    if (!seconds) return '0 daqiqa';
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor((seconds % (3600 * 24)) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const parts = [];
-    if (d > 0) parts.push(`${d} kun`);
-    if (h > 0) parts.push(`${h} soat`);
-    parts.push(`${m} daqiqa`);
-    return parts.join(' ');
-  }
-
-  formatDate(dateStr: string): string {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleString('uz-UZ', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
   }
 }

@@ -1,0 +1,185 @@
+<div class="channels-view">
+  <div class="view-header">
+    <div>
+      <h2 class="view-title">Kuzatilayotgan Kanallar</h2>
+      <p class="view-subtitle">Userbot ushbu kanallardagi yangi postlarni avtomatik monitoring qiladi</p>
+    </div>
+    <div class="header-right">
+      <span hlmBadge variant="secondary" class="total-badge">
+        Jami: {{ _channels().length }} ta
+      </span>
+      <button hlmBtn (click)="openAddModal()" class="gap-1.5 whitespace-nowrap">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        <span>Kanal Qo'shish</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="actions-bar">
+    <div class="search-container">
+      <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Kanal qidirish..."
+        class="pl-10 w-full"
+      />
+    </div>
+  </div>
+
+  <div class="channels-grid">
+    <div *ngFor="let ch of filtered()" class="channel-card">
+      <div class="channel-meta" (click)="openDetail(ch)">
+        <div class="channel-icon">📢</div>
+        <div class="channel-info">
+          <span class="channel-name" [title]="ch">{{ ch }}</span>
+          <span class="channel-sub">Monitoring faol</span>
+        </div>
+      </div>
+      <div class="channel-actions">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon"
+          (click)="openEdit(ch)"
+          title="Tahrirlash"
+          class="btn-action edit"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </button>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon"
+          (click)="promptDelete(ch)"
+          title="O'chirish"
+          class="btn-action trash"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="filtered().length === 0" class="empty-state">
+      <span>Kanal topilmadi</span>
+    </div>
+  </div>
+
+  <app-dialog
+    [isOpen]="addModalOpen()"
+    title="Yangi Kanal Qoʻshish"
+    description="Userbot tinglashi uchun ommaviy kanal username yoki guruh ID sini kiriting"
+    (closed)="addModalOpen.set(false)"
+  >
+    <div class="modal-form">
+      <label class="modal-label">Kanal manzili yoki ID</label>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="newChannelInput()"
+        (ngModelChange)="newChannelInput.set($event)"
+        placeholder="@uzrailways yoki -1001234567890"
+        (keyup.enter)="submitAdd()"
+        class="w-full"
+      />
+      <span class="modal-hint">Misol: @temiryol, @uzrailways_live yoki https://t.me/kanal_nomi</span>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="outline" (click)="addModalOpen.set(false)">
+        <span>Bekor qilish</span>
+      </button>
+      <button hlmBtn (click)="submitAdd()" [disabled]="!newChannelInput().trim()">
+        <span>Qoʻshish</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-dialog
+    [isOpen]="editModalOpen()"
+    title="Kanalni Tahrirlash"
+    description="Kanal identifikatorini oʻzgartirish"
+    (closed)="editModalOpen.set(false)"
+  >
+    <div class="modal-form">
+      <label class="modal-label">Kanal manzili yoki ID</label>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="editChannelInput()"
+        (ngModelChange)="editChannelInput.set($event)"
+        (keyup.enter)="submitEdit()"
+        class="w-full"
+      />
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="outline" (click)="editModalOpen.set(false)">
+        <span>Bekor qilish</span>
+      </button>
+      <button hlmBtn (click)="submitEdit()" [disabled]="!editChannelInput().trim()">
+        <span>Saqlash</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-dialog
+    [isOpen]="detailModalOpen()"
+    title="Kanal Ma'lumotlari"
+    description="Monitoring kanali haqida batafsil ma'lumot"
+    (closed)="detailModalOpen.set(false)"
+  >
+    <div class="detail-rows">
+      <div class="detail-row">
+        <span class="detail-key">Identifikator:</span>
+        <span class="detail-val font-mono">{{ selectedChannel() }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Holat:</span>
+        <span hlmBadge variant="success">Monitoring Faol</span>
+      </div>
+      <div *ngIf="getTelegramLink(selectedChannel())" class="detail-row">
+        <span class="detail-key">Telegram Havola:</span>
+        <a [href]="getTelegramLink(selectedChannel())" target="_blank" rel="noopener noreferrer" class="detail-link">
+          <span>Telegramda ochish</span>
+          <svg class="w-3.5 h-3.5 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="destructive" (click)="promptDelete(selectedChannel(), true)">
+        <span>Oʻchirish</span>
+      </button>
+      <button hlmBtn variant="outline" (click)="openEdit(selectedChannel())">
+        <span>Tahrirlash</span>
+      </button>
+      <button hlmBtn variant="secondary" (click)="detailModalOpen.set(false)">
+        <span>Yopish</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-confirm-modal
+    [isOpen]="confirmModalOpen()"
+    title="Kanalni O'chirish"
+    [message]="'Haqiqatan ham «' + selectedChannel() + '» kanalini monitoringdan oʻchirib tashlamoqchimisiz?'"
+    confirmText="Oʻchirish"
+    cancelText="Bekor qilish"
+    variant="destructive"
+    (confirmed)="confirmDelete()"
+    (cancelled)="confirmModalOpen.set(false)"
+  ></app-confirm-modal>
+</div>

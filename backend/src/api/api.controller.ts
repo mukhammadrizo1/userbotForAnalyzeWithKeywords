@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { UserbotService } from '../userbot/userbot.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -40,6 +40,13 @@ export class ApiController {
   }
 
   @UseGuards(AuthGuard)
+  @Put('channels/:id')
+  async updateChannel(@Param('id') id: string, @Body() body: any): Promise<any> {
+    const ok = await this.db.updateChannel(id, body.newIdent);
+    return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
   @Delete('channels/:id')
   async deleteChannel(@Param('id') id: string): Promise<any> {
     const ok = await this.db.deleteChannel(id);
@@ -57,6 +64,13 @@ export class ApiController {
   @Post('keywords')
   async addKeyword(@Body() body: any): Promise<any> {
     const ok = await this.db.addKeyword(body.word);
+    return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
+  @Put('keywords/:word')
+  async updateKeyword(@Param('word') word: string, @Body() body: any): Promise<any> {
+    const ok = await this.db.updateKeyword(word, body.newWord);
     return { success: ok };
   }
 
@@ -82,6 +96,17 @@ export class ApiController {
   }
 
   @UseGuards(AuthGuard)
+  @Put('groups/:type/:id')
+  async updateGroup(
+    @Param('type') type: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ): Promise<any> {
+    const ok = await this.db.updateGroup(id, type, body.newGroupId, body.newType);
+    return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
   @Delete('groups/:type/:id')
   async deleteGroup(@Param('type') type: string, @Param('id') id: string): Promise<any> {
     const ok = await this.db.deleteGroup(id, type);
@@ -94,5 +119,19 @@ export class ApiController {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
     const history = await this.db.getRecentHistory(isNaN(parsedLimit) ? 50 : parsedLimit);
     return { history };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('history/:id')
+  async deleteHistoryItem(@Param('id') id: string): Promise<any> {
+    const ok = await this.db.deleteHistoryItem(id);
+    return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('history')
+  async clearHistory(): Promise<any> {
+    const ok = await this.db.clearHistory();
+    return { success: ok };
   }
 }

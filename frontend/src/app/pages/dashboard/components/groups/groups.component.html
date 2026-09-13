@@ -1,0 +1,249 @@
+<div class="groups-view">
+  <div class="view-header">
+    <div>
+      <h2 class="view-title">Yo'naltiruvchi Guruhlar</h2>
+      <p class="view-subtitle">AI tahlil natijasiga ko'ra xabarlar mos guruhlarga avtomatik forward qilinadi</p>
+    </div>
+    <div class="header-right">
+      <span hlmBadge variant="secondary" class="total-badge">
+        Jami: {{ _groups().length }} ta
+      </span>
+      <button hlmBtn (click)="openAddModal()" class="gap-1.5 whitespace-nowrap">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        <span>Guruh Qo'shish</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="groups-columns">
+    <div class="column-card good-card">
+      <div class="column-header">
+        <div class="col-title-wrap">
+          <span class="status-dot green"></span>
+          <h4 class="column-title">🟢 Yaxshi Xabarlar</h4>
+        </div>
+        <div class="col-actions">
+          <span class="col-count">{{ goodGroups().length }} ta</span>
+          <button class="col-add-btn" (click)="openAddModal('good')" title="Yaxshi xabarlar guruhini qoʻshish">+</button>
+        </div>
+      </div>
+      <div class="items-list">
+        <div *ngFor="let g of goodGroups()" class="group-row">
+          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="row-actions">
+            <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            <button class="btn-icon trash" (click)="promptDelete(g)" title="O'chirish">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div *ngIf="goodGroups().length === 0" class="empty-col">
+          <span>Guruh belgilanmagan</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="column-card bad-card">
+      <div class="column-header">
+        <div class="col-title-wrap">
+          <span class="status-dot red"></span>
+          <h4 class="column-title">🔴 Yomon Xabarlar</h4>
+        </div>
+        <div class="col-actions">
+          <span class="col-count">{{ badGroups().length }} ta</span>
+          <button class="col-add-btn" (click)="openAddModal('bad')" title="Yomon xabarlar guruhini qoʻshish">+</button>
+        </div>
+      </div>
+      <div class="items-list">
+        <div *ngFor="let g of badGroups()" class="group-row">
+          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="row-actions">
+            <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            <button class="btn-icon trash" (click)="promptDelete(g)" title="O'chirish">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div *ngIf="badGroups().length === 0" class="empty-col">
+          <span>Guruh belgilanmagan</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="column-card neu-card">
+      <div class="column-header">
+        <div class="col-title-wrap">
+          <span class="status-dot gray"></span>
+          <h4 class="column-title">⚪️ Neytral Xabarlar</h4>
+        </div>
+        <div class="col-actions">
+          <span class="col-count">{{ neutralGroups().length }} ta</span>
+          <button class="col-add-btn" (click)="openAddModal('neutral')" title="Neytral xabarlar guruhini qoʻshish">+</button>
+        </div>
+      </div>
+      <div class="items-list">
+        <div *ngFor="let g of neutralGroups()" class="group-row">
+          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="row-actions">
+            <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            <button class="btn-icon trash" (click)="promptDelete(g)" title="O'chirish">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div *ngIf="neutralGroups().length === 0" class="empty-col">
+          <span>Guruh belgilanmagan</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <app-dialog
+    [isOpen]="addModalOpen()"
+    title="Yangi Yo'naltiruvchi Guruh Qoʻshish"
+    description="Tahlil qilingan xabarlar forward qilinadigan guruh username yoki ID sini kiriting"
+    (closed)="addModalOpen.set(false)"
+  >
+    <div class="modal-form">
+      <label class="modal-label">Guruh identifikatori</label>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="newGroupId()"
+        (ngModelChange)="newGroupId.set($event)"
+        placeholder="@yaxshiposttest yoki -1001234567890"
+        (keyup.enter)="submitAdd()"
+        class="w-full"
+      />
+
+      <label class="modal-label mt-2">Yo'naltirish Toifasi</label>
+      <select
+        [ngModel]="newGroupType()"
+        (ngModelChange)="newGroupType.set($event)"
+        class="modal-select"
+      >
+        <option value="good">🟢 Yaxshi (Ijobiy xabarlar)</option>
+        <option value="bad">🔴 Yomon (Shikoyat & Kechikish)</option>
+        <option value="neutral">⚪️ Neytral (Ma'lumot & Savollar)</option>
+      </select>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="outline" (click)="addModalOpen.set(false)">
+        <span>Bekor qilish</span>
+      </button>
+      <button hlmBtn (click)="submitAdd()" [disabled]="!newGroupId().trim()">
+        <span>Qoʻshish</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-dialog
+    [isOpen]="editModalOpen()"
+    title="Guruhni Tahrirlash"
+    description="Guruh manzili yoki yo'naltirish toifasini o'zgartirish"
+    (closed)="editModalOpen.set(false)"
+  >
+    <div class="modal-form">
+      <label class="modal-label">Guruh identifikatori</label>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="editGroupId()"
+        (ngModelChange)="editGroupId.set($event)"
+        (keyup.enter)="submitEdit()"
+        class="w-full"
+      />
+
+      <label class="modal-label mt-2">Toifa</label>
+      <select
+        [ngModel]="editGroupType()"
+        (ngModelChange)="editGroupType.set($event)"
+        class="modal-select"
+      >
+        <option value="good">🟢 Yaxshi (Ijobiy xabarlar)</option>
+        <option value="bad">🔴 Yomon (Shikoyat & Kechikish)</option>
+        <option value="neutral">⚪️ Neytral (Ma'lumot & Savollar)</option>
+      </select>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="outline" (click)="editModalOpen.set(false)">
+        <span>Bekor qilish</span>
+      </button>
+      <button hlmBtn (click)="submitEdit()" [disabled]="!editGroupId().trim()">
+        <span>Saqlash</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-dialog
+    [isOpen]="detailModalOpen()"
+    title="Guruh Tafsilotlari"
+    description="Yo'naltiruvchi guruh haqida batafsil ma'lumot"
+    (closed)="detailModalOpen.set(false)"
+  >
+    <div class="detail-rows">
+      <div class="detail-row">
+        <span class="detail-key">Guruh ID / Manzil:</span>
+        <span class="detail-val font-mono">{{ selectedGroup()?.group_id }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Toifa:</span>
+        <span class="detail-val">{{ getTypeLabel(selectedGroup()?.type) }}</span>
+      </div>
+      <div *ngIf="getTelegramLink(selectedGroup()?.group_id)" class="detail-row">
+        <span class="detail-key">Telegram Havola:</span>
+        <a [href]="getTelegramLink(selectedGroup()?.group_id)" target="_blank" rel="noopener noreferrer" class="detail-link">
+          <span>Telegramda ochish</span>
+          <svg class="w-3.5 h-3.5 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div dialog-footer class="modal-actions">
+      <button hlmBtn variant="destructive" (click)="promptDelete(selectedGroup(), true)">
+        <span>Oʻchirish</span>
+      </button>
+      <button hlmBtn variant="outline" (click)="openEdit(selectedGroup())">
+        <span>Tahrirlash</span>
+      </button>
+      <button hlmBtn variant="secondary" (click)="detailModalOpen.set(false)">
+        <span>Yopish</span>
+      </button>
+    </div>
+  </app-dialog>
+
+  <app-confirm-modal
+    [isOpen]="confirmModalOpen()"
+    title="Guruhni O'chirish"
+    [message]="'Haqiqatan ham «' + selectedGroup()?.group_id + '» guruhini ushbu toifadan oʻchirmoqchimisiz?'"
+    confirmText="Oʻchirish"
+    cancelText="Bekor qilish"
+    variant="destructive"
+    (confirmed)="confirmDelete()"
+    (cancelled)="confirmModalOpen.set(false)"
+  ></app-confirm-modal>
+</div>

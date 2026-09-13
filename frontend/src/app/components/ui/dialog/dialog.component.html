@@ -1,0 +1,23 @@
+<div *ngIf="isOpen" class="dialog-backdrop" (click)="onBackdropClick($event)">
+  <div class="dialog-container" [ngClass]="maxWidthClass">
+    <div class="dialog-header">
+      <div class="dialog-title-wrap">
+        <h3 class="dialog-title">{{ title }}</h3>
+        <p *ngIf="description" class="dialog-description">{{ description }}</p>
+      </div>
+      <button class="dialog-close-btn" (click)="close()" title="Yopish">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="dialog-content">
+      <ng-content></ng-content>
+    </div>
+
+    <div class="dialog-footer">
+      <ng-content select="[dialog-footer]"></ng-content>
+    </div>
+  </div>
+</div>

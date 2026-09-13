@@ -72,19 +72,7 @@ git push origin main
 
 ---
 
-## 4-Qadam: Frontendni Backend bilan ulash
-
-1. Vercel dagi saytingizga kiring (`/login`).
-2. Login: `admin`, Parol: `admin123` (yoki o'rnatgan parolingiz).
-3. Dashboard ochilgach, **⚙️ Tizim & Holat** bo'limiga o'ting.
-4. **Backend API Manzili (Render / Server URL)** qatoriga Render dagi havolangizni yozing:
-   `https://uty-userbot-backend.onrender.com`
-5. **Saqlash** tugmasini bosing.
-6. Barcha kanallar, kalit so'zlar, guruhlar va tarix ko'rinadi!
-
----
-
-## 5-Qadam: Render.com Uxlab qolmasligi uchun (24/7 Keep-Alive)
+## 4-Qadam: Render.com Uxlab qolmasligi uchun (24/7 Keep-Alive)
 
 Render.com ning bepul tarifida veb-servis 15 daqiqa murojaat bo'lmasa uxlab qoladi. Buni oldini olish juda oson:
 
@@ -96,3 +84,4 @@ Render.com ning bepul tarifida veb-servis 15 daqiqa murojaat bo'lmasa uxlab qola
 6. **Monitoring Interval:** `Every 5 minutes` (har 5 daqiqada).
 7. **Create Monitor** ni bosing.
 8. Endi Userbot va Backend 24/7 uzluksiz ishlab turadi!
+

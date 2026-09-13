@@ -63,6 +63,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return (res.rowCount ?? 0) > 0;
   }
 
+  async updateChannel(oldIdent: string, newIdent: string): Promise<boolean> {
+    const cleanOld = oldIdent.replace('https://t.me/', '').replace('@', '').trim();
+    const cleanNew = newIdent.replace('https://t.me/', '').replace('@', '').trim();
+    if (!cleanNew) return false;
+    const res = await this.query('UPDATE channels SET ident = $1 WHERE ident = $2', [cleanNew, cleanOld]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
   async deleteChannel(ident: string): Promise<boolean> {
     const clean = ident.replace('https://t.me/', '').replace('@', '').trim();
     const res = await this.query('DELETE FROM channels WHERE ident = $1', [clean]);
@@ -81,6 +89,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       'INSERT INTO keywords (word) VALUES ($1) ON CONFLICT (word) DO NOTHING',
       [clean],
     );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async updateKeyword(oldWord: string, newWord: string): Promise<boolean> {
+    const cleanOld = oldWord.toLowerCase().trim();
+    const cleanNew = newWord.toLowerCase().trim();
+    if (cleanNew.length < 2) return false;
+    const res = await this.query('UPDATE keywords SET word = $1 WHERE word = $2', [cleanNew, cleanOld]);
     return (res.rowCount ?? 0) > 0;
   }
 
@@ -106,6 +122,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const res = await this.query(
       'INSERT INTO groups (group_id, type) VALUES ($1, $2) ON CONFLICT (group_id, type) DO NOTHING',
       [cleanId, cleanType],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async updateGroup(oldGroupId: string, oldType: string, newGroupId: string, newType: string): Promise<boolean> {
+    const cleanOldId = oldGroupId.trim();
+    const cleanOldType = oldType.toLowerCase().trim();
+    const cleanNewId = newGroupId.trim();
+    const cleanNewType = newType.toLowerCase().trim();
+    if (!['good', 'bad', 'neutral'].includes(cleanNewType)) return false;
+    const res = await this.query(
+      'UPDATE groups SET group_id = $1, type = $2 WHERE group_id = $3 AND type = $4',
+      [cleanNewId, cleanNewType, cleanOldId, cleanOldType],
     );
     return (res.rowCount ?? 0) > 0;
   }
@@ -143,6 +172,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       [limit],
     );
     return res.rows;
+  }
+
+  async deleteHistoryItem(uniqueId: string): Promise<boolean> {
+    const res = await this.query('DELETE FROM history WHERE msg_unique_id = $1', [uniqueId]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async clearHistory(): Promise<boolean> {
+    const res = await this.query('DELETE FROM history');
+    return (res.rowCount ?? 0) >= 0;
   }
 
   async getCounts(): Promise<any> {
