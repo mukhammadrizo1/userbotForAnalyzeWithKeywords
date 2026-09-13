@@ -108,3 +108,20 @@
     transform: scale(1) translateY(0);
   }
 }
+
+@media (max-width: 640px) {
+  .dialog-backdrop {
+    padding: 0.5rem;
+  }
+  .dialog-header {
+    padding: 1rem;
+  }
+  .dialog-content {
+    padding: 1rem;
+  }
+  .dialog-footer {
+    padding: 0.875rem 1rem;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+}

@@ -14,10 +14,10 @@ import { InputComponent } from '../../components/ui/input/input.component';
   styleUrl: './login.component.css',
 })
 export class LoginComponent {
-
   username = '';
   password = '';
   loading = signal(false);
+  showPassword = signal(false);
   errorMessage = signal('');
 
   constructor(
@@ -27,6 +27,10 @@ export class LoginComponent {
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/dashboard']);
     }
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword.set(!this.showPassword());
   }
 
   onSubmit(): void {

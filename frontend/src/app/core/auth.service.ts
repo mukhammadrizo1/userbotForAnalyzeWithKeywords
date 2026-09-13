@@ -21,11 +21,19 @@ export class AuthService {
     private router: Router,
   ) {}
 
+  private getApiUrl(): string {
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return 'https://uty-userbot-backend.onrender.com';
+      }
+    }
+    return environment.apiUrl || 'https://uty-userbot-backend.onrender.com';
+  }
+
   login(credentials: any): Observable<any> {
-    const url = `${environment.apiUrl || ''}/api/auth/login`;
+    const url = `${this.getApiUrl()}/api/auth/login`;
     return this.http.post<any>(url, credentials).pipe(
-
-
       tap((res: any) => {
         if (res && res.access_token) {
           localStorage.setItem('token', res.access_token);

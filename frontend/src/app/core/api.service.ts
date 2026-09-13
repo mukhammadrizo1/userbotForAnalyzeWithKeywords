@@ -8,7 +8,14 @@ import { environment } from '../../environments/environment';
 })
 export class ApiService {
   private get base(): string {
-    return `${environment.apiUrl || ''}/api`;
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return 'https://uty-userbot-backend.onrender.com/api';
+      }
+    }
+    const apiUrl = environment.apiUrl || 'https://uty-userbot-backend.onrender.com';
+    return `${apiUrl}/api`;
   }
 
   constructor(private http: HttpClient) {}

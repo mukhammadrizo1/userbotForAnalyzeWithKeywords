@@ -15,8 +15,10 @@
     [connected]="status()?.connected"
     [botUser]="status()?.botUser"
     [collapsed]="sidebarCollapsed()"
+    [mobileOpen]="mobileSidebarOpen()"
     (sectionChange)="activeSection.set($event)"
     (toggleCollapse)="toggleSidebar()"
+    (closeMobile)="closeMobileSidebar()"
     (logoutClick)="logout()"
   ></app-sidebar>
 

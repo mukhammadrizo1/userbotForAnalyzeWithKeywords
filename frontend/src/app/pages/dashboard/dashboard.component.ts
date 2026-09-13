@@ -33,6 +33,7 @@ import { SystemStatusComponent } from './components/system-status/system-status.
 export class DashboardComponent implements OnInit {
   activeSection = signal<string>('channels');
   sidebarCollapsed = signal<boolean>(false);
+  mobileSidebarOpen = signal<boolean>(false);
   status = signal<any>(null);
   loading = signal<boolean>(false);
   toast = signal<any>(null);
@@ -52,7 +53,15 @@ export class DashboardComponent implements OnInit {
   }
 
   toggleSidebar(): void {
-    this.sidebarCollapsed.set(!this.sidebarCollapsed());
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      this.mobileSidebarOpen.set(!this.mobileSidebarOpen());
+    } else {
+      this.sidebarCollapsed.set(!this.sidebarCollapsed());
+    }
+  }
+
+  closeMobileSidebar(): void {
+    this.mobileSidebarOpen.set(false);
   }
 
   refreshAll(): void {
