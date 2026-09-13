@@ -1,0 +1,488 @@
+<div class="dash-layout">
+  <div *ngIf="toast()" class="dash-toast" [ngClass]="toast().type">
+    <svg *ngIf="toast().type === 'success'" class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+    </svg>
+    <svg *ngIf="toast().type === 'error'" class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+    <span>{{ toast().message }}</span>
+  </div>
+
+  <header class="dash-navbar">
+    <div class="dash-brand">
+      <div class="dash-logo">
+        <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="dash-title">UTY UserBot Control Center</h1>
+        <p class="dash-subtitle">Telegram Kanallari & AI Filtrlash Paneli</p>
+      </div>
+    </div>
+
+    <div class="dash-header-actions">
+      <span hlmBadge [variant]="status()?.connected ? 'success' : 'warning'" class="gap-1.5 py-1 px-3">
+        <span class="status-dot"></span>
+        <span>{{ status()?.connected ? 'Telegram Faol' : 'Bot Kutishda' }}</span>
+      </span>
+
+      <span hlmBadge variant="outline" class="gap-1.5 py-1 px-3 text-purple-400 border-purple-500/30 bg-purple-500/10">
+        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        <span>{{ status()?.groqModel || 'Groq AI' }}</span>
+      </span>
+
+      <button hlmBtn variant="outline" size="icon" (click)="refreshAll()" title="Yangilash">
+        <svg class="w-5 h-5 text-slate-400 hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+
+      <button hlmBtn variant="destructive" size="sm" (click)="logout()" class="gap-1.5">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        <span>Chiqish</span>
+      </button>
+    </div>
+
+  </header>
+
+  <main class="dash-content">
+    <div class="metrics-grid">
+      <div class="metric-card" (click)="activeTab.set('channels')">
+        <div class="metric-info">
+          <span class="metric-label">Kuzatilayotgan Kanallar</span>
+          <span class="metric-value">{{ status()?.stats?.channels ?? channels().length }}</span>
+        </div>
+        <div class="metric-icon-box blue">
+          <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric-card" (click)="activeTab.set('keywords')">
+        <div class="metric-info">
+          <span class="metric-label">Faol Kalit So'zlar</span>
+          <span class="metric-value">{{ status()?.stats?.keywords ?? keywords().length }}</span>
+        </div>
+        <div class="metric-icon-box amber">
+          <svg class="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric-card" (click)="activeTab.set('groups')">
+        <div class="metric-info">
+          <span class="metric-label">Yo'naltirilgan Guruhlar</span>
+          <span class="metric-value">{{ status()?.stats?.groups ?? groups().length }}</span>
+        </div>
+        <div class="metric-icon-box emerald">
+          <svg class="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric-card" (click)="activeTab.set('history')">
+        <div class="metric-info">
+          <span class="metric-label">Tahlil Xabarlari</span>
+          <span class="metric-value">{{ status()?.stats?.history ?? history().length }}</span>
+        </div>
+        <div class="metric-icon-box violet">
+          <svg class="w-6 h-6 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-tabs">
+      <button
+        (click)="activeTab.set('channels')"
+        class="tab-btn"
+        [class.active]="activeTab() === 'channels'"
+      >
+        <span>📢 Kanallar</span>
+        <span class="tab-pill">{{ channels().length }}</span>
+      </button>
+
+      <button
+        (click)="activeTab.set('keywords')"
+        class="tab-btn"
+        [class.active]="activeTab() === 'keywords'"
+      >
+        <span>🔑 Kalit So'zlar</span>
+        <span class="tab-pill">{{ keywords().length }}</span>
+      </button>
+
+      <button
+        (click)="activeTab.set('groups')"
+        class="tab-btn"
+        [class.active]="activeTab() === 'groups'"
+      >
+        <span>🎯 Guruhlar</span>
+        <span class="tab-pill">{{ groups().length }}</span>
+      </button>
+
+      <button
+        (click)="activeTab.set('history')"
+        class="tab-btn"
+        [class.active]="activeTab() === 'history'"
+      >
+        <span>📜 Tahlil Tarixi</span>
+        <span class="tab-pill">{{ history().length }}</span>
+      </button>
+
+      <button
+        (click)="activeTab.set('system')"
+        class="tab-btn"
+        [class.active]="activeTab() === 'system'"
+      >
+        <span>⚙️ Tizim & Holat</span>
+      </button>
+    </div>
+
+    <div class="tab-content">
+      <div *ngIf="activeTab() === 'channels'" class="tab-pane">
+        <div class="pane-header">
+          <div class="search-box">
+            <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+              hlmInput
+              type="text"
+              [ngModel]="channelSearch()"
+              (ngModelChange)="channelSearch.set($event)"
+              placeholder="Kanallardan qidirish..."
+              class="pl-10"
+            />
+          </div>
+
+          <div class="add-box">
+            <input
+              hlmInput
+              type="text"
+              [ngModel]="newChannel()"
+              (ngModelChange)="newChannel.set($event)"
+              placeholder="Kanal username yoki ID (@kunuzofficial)"
+              class="flex-1"
+              (keyup.enter)="addChannel()"
+            />
+            <button hlmBtn (click)="addChannel()" class="gap-1.5 whitespace-nowrap">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              <span>Qo'shish</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="channels-grid">
+          <div *ngFor="let ch of filteredChannels()" class="channel-card">
+            <div class="channel-meta">
+              <div class="channel-icon">📢</div>
+              <span class="channel-name" [title]="ch">{{ ch }}</span>
+            </div>
+            <button hlmBtn variant="ghost" size="icon" (click)="deleteChannel(ch)" title="O'chirish" class="text-slate-400 hover:text-rose-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+          <div *ngIf="filteredChannels().length === 0" class="empty-state">
+            <span>Hech qanday kanal topilmadi</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="activeTab() === 'keywords'" class="tab-pane">
+        <div class="pane-header">
+          <div class="search-box">
+            <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+              hlmInput
+              type="text"
+              [ngModel]="keywordSearch()"
+              (ngModelChange)="keywordSearch.set($event)"
+              placeholder="Kalit so'zlardan qidirish..."
+              class="pl-10"
+            />
+          </div>
+
+          <div class="add-box">
+            <input
+              hlmInput
+              type="text"
+              [ngModel]="newKeyword()"
+              (ngModelChange)="newKeyword.set($event)"
+              placeholder="Yangi so'z (masalan: afrosiyob)"
+              class="flex-1"
+              (keyup.enter)="addKeyword()"
+            />
+            <button hlmBtn (click)="addKeyword()" class="gap-1.5 whitespace-nowrap">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              <span>Qo'shish</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="keywords-wrap">
+          <div *ngFor="let kw of filteredKeywords()" class="keyword-chip">
+            <span class="kw-text">{{ kw }}</span>
+            <button (click)="deleteKeyword(kw)" class="kw-delete" title="O'chirish">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div *ngIf="filteredKeywords().length === 0" class="empty-state">
+            <span>Hech qanday kalit so'z topilmadi</span>
+          </div>
+        </div>
+      </div>
+
+
+      <div *ngIf="activeTab() === 'groups'" class="tab-pane">
+        <hlm-card class="mb-4">
+          <h3 class="groups-add-title">Yangi Yo'naltiruvchi Guruh Qo'shish</h3>
+          <div class="groups-add-form">
+            <input
+              hlmInput
+              type="text"
+              [ngModel]="newGroupId()"
+              (ngModelChange)="newGroupId.set($event)"
+              placeholder="Guruh username yoki ID (@yaxshiposttest yoki -100123...)"
+              class="flex-1"
+            />
+            <select
+              [ngModel]="newGroupType()"
+              (ngModelChange)="newGroupType.set($event)"
+              class="group-select"
+            >
+              <option value="good">🟢 Yaxshi (Ijobiy xabarlar)</option>
+              <option value="bad">🔴 Yomon (Shikoyat & Kechikish)</option>
+              <option value="neutral">⚪️ Neytral (Ma'lumot & Savollar)</option>
+            </select>
+            <button hlmBtn (click)="addGroup()">
+              <span>Guruhni Saqlash</span>
+            </button>
+          </div>
+        </hlm-card>
+
+
+        <div class="groups-columns">
+          <div class="group-column good-col">
+            <div class="group-col-header">
+              <span class="status-indicator-dot green"></span>
+              <h4>🟢 Yaxshi Xabarlar ({{ goodGroups().length }})</h4>
+            </div>
+            <div class="group-items">
+              <div *ngFor="let g of goodGroups()" class="group-item">
+                <span class="group-id-text">{{ g.group_id }}</span>
+                <button (click)="deleteGroup(g.group_id, g.type)" class="btn-delete">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+              <div *ngIf="goodGroups().length === 0" class="empty-state">
+                <span>Guruh belgilanmagan</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="group-column bad-col">
+            <div class="group-col-header">
+              <span class="status-indicator-dot red"></span>
+              <h4>🔴 Yomon Xabarlar ({{ badGroups().length }})</h4>
+            </div>
+            <div class="group-items">
+              <div *ngFor="let g of badGroups()" class="group-item">
+                <span class="group-id-text">{{ g.group_id }}</span>
+                <button (click)="deleteGroup(g.group_id, g.type)" class="btn-delete">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+              <div *ngIf="badGroups().length === 0" class="empty-state">
+                <span>Guruh belgilanmagan</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="group-column neu-col">
+            <div class="group-col-header">
+              <span class="status-indicator-dot gray"></span>
+              <h4>⚪️ Neytral Xabarlar ({{ neutralGroups().length }})</h4>
+            </div>
+            <div class="group-items">
+              <div *ngFor="let g of neutralGroups()" class="group-item">
+                <span class="group-id-text">{{ g.group_id }}</span>
+                <button (click)="deleteGroup(g.group_id, g.type)" class="btn-delete">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+              <div *ngIf="neutralGroups().length === 0" class="empty-state">
+                <span>Guruh belgilanmagan</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="activeTab() === 'history'" class="tab-pane">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Xabar ID</th>
+                <th>Kanal / Manba</th>
+                <th>AI Xulosasi</th>
+                <th>Holat</th>
+                <th>Vaqti</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let h of history()">
+                <td class="font-mono text-xs text-slate-400">{{ h.msg_unique_id }}</td>
+                <td class="text-sm font-medium text-slate-300">{{ h.channel || 'Nomaʼlum' }}</td>
+                <td>
+                  <span
+                    class="sentiment-badge"
+                    [ngClass]="{
+                      'sentiment-good': h.sentiment === 'YAXSHI',
+                      'sentiment-bad': h.sentiment === 'YOMON',
+                      'sentiment-neu': h.sentiment === 'NEYTRAL',
+                      'sentiment-skip': !h.sentiment || h.sentiment === 'SKIP' || h.sentiment === 'SKIPPED'
+                    }"
+                  >
+                    {{ h.sentiment || 'SAQLANGAN' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="text-xs text-slate-400">{{ h.status || 'OK' }}</span>
+                </td>
+                <td class="text-xs text-slate-400">{{ formatDate(h.date_added) }}</td>
+              </tr>
+              <tr *ngIf="history().length === 0">
+                <td colspan="5" class="text-center py-8 text-slate-500">
+                  Hozircha xabarlar tarixi mavjud emas
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div *ngIf="activeTab() === 'system'" class="tab-pane">
+        <div class="system-grid">
+
+          <hlm-card>
+            <h3 class="sys-title">Bot & Foydalanuvchi Ma'lumotlari</h3>
+            <div class="sys-list">
+              <div class="sys-item">
+                <span class="sys-key">Telegram Userbot Holati:</span>
+                <span class="sys-val" [class.text-emerald-400]="status()?.connected" [class.text-amber-400]="!status()?.connected">
+                  {{ status()?.connected ? 'Ulangan (Online)' : 'Ulanmagan (ENV tekshiring)' }}
+                </span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Foydalanuvchi:</span>
+                <span class="sys-val">{{ status()?.botUser?.firstName || 'UTY Monitor' }} ({{ status()?.botUser?.username ? '@' + status()?.botUser?.username : 'Userbot' }})</span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Telefon:</span>
+                <span class="sys-val">{{ status()?.botUser?.phone || '-' }}</span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Ishlash Vaqti (Uptime):</span>
+                <span class="sys-val">{{ formatUptime(status()?.uptimeSeconds) }}</span>
+              </div>
+            </div>
+          </hlm-card>
+
+          <hlm-card>
+            <h3 class="sys-title">AI (Groq LLM) Konfiguratsiyasi</h3>
+            <div class="sys-list">
+              <div class="sys-item">
+                <span class="sys-key">Groq AI Holati:</span>
+                <span class="sys-val" [class.text-emerald-400]="status()?.groqReady" [class.text-rose-400]="!status()?.groqReady">
+                  {{ status()?.groqReady ? 'Faol & Tayyor' : 'GROQ_API_KEY oʻrnatilmagan' }}
+                </span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Model:</span>
+                <span class="sys-val font-mono">{{ status()?.groqModel }}</span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Tahlil Yo'nalishi:</span>
+                <span class="sys-val">O'zbekiston Temir Yo'llari (UTY)</span>
+              </div>
+              <div class="sys-item">
+                <span class="sys-key">Kategoriya turlari:</span>
+                <span class="sys-val">YAXSHI / YOMON / NEYTRAL / SKIP</span>
+              </div>
+            </div>
+          </hlm-card>
+
+          <hlm-card class="full-col">
+            <h3 class="sys-title">Backend API Manzili (Render / Server URL)</h3>
+            <p class="text-sm text-slate-400 mb-3">
+              Render.com da backend deploy qilingandan so'ng berilgan URL ni shu yerga kiriting (masalan: <code>https://userbot-backend.onrender.com</code>). Bo'sh qoldirilsa joriy domen ishlatiladi.
+            </p>
+            <div class="ping-bar">
+              <input
+                hlmInput
+                type="text"
+                [ngModel]="backendUrl()"
+                (ngModelChange)="backendUrl.set($event)"
+                placeholder="https://userbot-backend.onrender.com"
+                class="flex-1 font-mono text-xs"
+              />
+              <button hlmBtn (click)="saveBackendUrl()">
+                <span>Saqlash</span>
+              </button>
+            </div>
+          </hlm-card>
+
+          <hlm-card class="full-col">
+            <h3 class="sys-title">UptimeRobot & Render Keep-Alive Ulanishi</h3>
+            <p class="text-sm text-slate-400 mb-4">
+              Render.com bepul versiyasi uxlab qolmasligi uchun quyidagi URL ni UptimeRobot yoki cron-job.org servisiga bepul ulab qo'ying (har 5 daqiqada ping):
+            </p>
+            <div class="ping-bar">
+              <input
+                hlmInput
+                type="text"
+                readonly
+                value="/api/ping"
+                class="flex-1 font-mono text-xs"
+              />
+              <button hlmBtn (click)="testPing()">
+                <span>Ping Sinash</span>
+              </button>
+            </div>
+            <div *ngIf="pingData()" class="ping-result font-mono text-xs mt-3">
+              {{ pingData() | json }}
+            </div>
+          </hlm-card>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+

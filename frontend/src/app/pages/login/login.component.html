@@ -1,0 +1,85 @@
+<div class="login-wrapper">
+  <div class="login-bg-glow"></div>
+  
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-logo-badge">
+        <svg class="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <h1 class="login-title">UTY UserBot Dashboard</h1>
+      <p class="login-subtitle">O'zbekiston Temir Yo'llari AI Monitoring & Boshqaruv Tizimi</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" class="login-form">
+      <div *ngIf="errorMessage()" class="login-alert">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <span>{{ errorMessage() }}</span>
+      </div>
+
+      <div class="form-group">
+        <label for="username" class="form-label">Foydalanuvchi nomi</label>
+        <div class="input-container">
+          <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          <input
+            hlmInput
+            id="username"
+            name="username"
+            type="text"
+            [(ngModel)]="username"
+            placeholder="admin"
+            required
+            autocomplete="username"
+            class="pl-11"
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="form-label">Maxfiy parol</label>
+        <div class="input-container">
+          <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <input
+            hlmInput
+            id="password"
+            name="password"
+            type="password"
+            [(ngModel)]="password"
+            placeholder="••••••••"
+            required
+            autocomplete="current-password"
+            class="pl-11"
+          />
+        </div>
+      </div>
+
+      <button
+        hlmBtn
+        type="submit"
+        [disabled]="loading()"
+        class="w-full mt-2 h-11"
+      >
+        <span *ngIf="!loading()">Tizimga kirish</span>
+        <span *ngIf="loading()" class="loading-state">
+          <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          Kirilmoqda...
+        </span>
+      </button>
+
+    </form>
+    
+    <div class="login-footer">
+      <span>Render.com & Neon.tech PostgreSQL himoyalangan</span>
+    </div>
+  </div>
+</div>
