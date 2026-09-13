@@ -8,7 +8,8 @@ import { DatabaseService } from '../database/database.service';
 @Injectable()
 export class UserbotService implements OnModuleInit {
   private client: any = null;
-  private groqClient: any = null;
+  private groqClients: any[] = [];
+  private currentGroqIndex = 0;
   private albumBuffer: Map<string, any> = new Map();
   private isConnected = false;
   private botInfo: any = null;
@@ -22,15 +23,22 @@ export class UserbotService implements OnModuleInit {
   }
 
   private initGroq() {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (apiKey && apiKey.trim()) {
-      try {
-        this.groqClient = new Groq({ apiKey: apiKey.trim() });
-      } catch {
-        this.groqClient = null;
-      }
-    }
+    const raw = process.env.GROQ_API_KEY || '';
+    const keys = raw
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    this.groqClients = keys
+      .map((k) => {
+        try {
+          return new Groq({ apiKey: k });
+        } catch {
+          return null;
+        }
+      })
+      .filter((c) => c !== null);
   }
+
 
   private async initTelegram() {
     const apiIdStr = process.env.TELEGRAM_API_ID;
@@ -311,7 +319,7 @@ export class UserbotService implements OnModuleInit {
   }
 
   private async analyzeContentSmart(text: string): Promise<string> {
-    if (!this.groqClient) return 'ERROR';
+    if (!this.groqClients || this.groqClients.length === 0) return 'ERROR';
 
     const systemPrompt = `Sen professional tahlilchisan. Senga Telegram xabarlari yuboriladi (O'zbek, Rus, Ingliz tilida).
 Vazifang: Matn 'O'zbekiston Temir Yo'llari' (UTY), uning poyezdlari (Afrosiyob, Sharq, Nasaf), vokzallari, chiptalari yoki xizmatlariga aloqadorligini aniqlash.
@@ -324,29 +332,34 @@ QOIDALAR:
    - 'NEYTRAL' (Oddiy ma'lumot, savol)
 Javob faqat bitta so'z bo'lsin.`;
 
-
     const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-    try {
-      const completion = await this.groqClient.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Matn: ${text}` },
-        ],
-        model,
-        temperature: 0,
-        max_tokens: 15,
-      });
+    for (let attempt = 0; attempt < this.groqClients.length; attempt++) {
+      const client = this.groqClients[this.currentGroqIndex];
+      this.currentGroqIndex = (this.currentGroqIndex + 1) % this.groqClients.length;
 
-      const result = (completion.choices[0]?.message?.content || '').trim().toUpperCase();
-      if (result.includes('SKIP')) return 'SKIP';
-      if (result.includes('YAXSHI')) return 'YAXSHI';
-      if (result.includes('YOMON')) return 'YOMON';
-      if (result.includes('NEYTRAL')) return 'NEYTRAL';
-      return 'SKIP';
-    } catch {
-      return 'ERROR';
+      try {
+        const completion = await client.chat.completions.create({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Matn: ${text}` },
+          ],
+          model,
+          temperature: 0,
+          max_tokens: 15,
+        });
+
+        const result = (completion.choices[0]?.message?.content || '').trim().toUpperCase();
+        if (result.includes('SKIP')) return 'SKIP';
+        if (result.includes('YAXSHI')) return 'YAXSHI';
+        if (result.includes('YOMON')) return 'YOMON';
+        if (result.includes('NEYTRAL')) return 'NEYTRAL';
+        return 'SKIP';
+      } catch {
+        continue;
+      }
     }
+    return 'ERROR';
   }
 
   private normalizeText(text: string): string {
@@ -365,10 +378,12 @@ Javob faqat bitta so'z bo'lsin.`;
     return {
       connected: this.isConnected,
       botUser: this.botInfo,
-      groqReady: !!this.groqClient,
+      groqReady: this.groqClients.length > 0,
+      groqKeysCount: this.groqClients.length,
       groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
       stats: counts,
     };
   }
 }
+

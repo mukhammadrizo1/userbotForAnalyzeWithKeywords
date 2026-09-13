@@ -43,7 +43,8 @@ git push origin main
 | `TELEGRAM_API_ID` | `SIZNING_TELEGRAM_API_ID` | my.telegram.org dan olingan raqam |
 | `TELEGRAM_API_HASH` | `SIZNING_TELEGRAM_API_HASH` | my.telegram.org dan olingan hash |
 | `TELEGRAM_STRING_SESSION` | `backend/.env` faylingizdagi string sessiya kodi | Userbot sessiyasi (bir qatorda) |
-| `GROQ_API_KEY` | `gsk_...` | console.groq.com dan bepul API kalit |
+| `GROQ_API_KEY` | `gsk_...` | console.groq.com dan bepul API kalit (1 ta yoki limitdan qochish uchun vergul bilan bir nechta: `gsk_1,gsk_2`) |
+
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | AI modeli |
 | `JWT_SECRET` | `uty_userbot_secret_jwt_key_2026` | Ixtiyoriy maxfiy kalit |
 | `DASHBOARD_USERNAME` | `admin` | Dashboardga kirish logini |
