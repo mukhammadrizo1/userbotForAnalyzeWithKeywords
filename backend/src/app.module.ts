@@ -7,6 +7,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { AuthController } from './auth/auth.controller';
 import { UserbotService } from './userbot/userbot.service';
 import { ApiController } from './api/api.controller';
+import { LoggerService } from './logger/logger.service';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ApiController } from './api/api.controller';
     }),
   ],
   controllers: [AuthController, ApiController],
-  providers: [DatabaseService, AuthService, AuthGuard, UserbotService],
+  providers: [DatabaseService, AuthService, AuthGuard, UserbotService, LoggerService],
+  exports: [LoggerService],
 })
 export class AppModule {}

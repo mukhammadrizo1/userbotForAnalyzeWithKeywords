@@ -1,0 +1,168 @@
+<div class="logs-view">
+  <div class="logs-header">
+    <div class="header-left">
+      <div class="title-wrap">
+        <h3 class="logs-title">Jonli Tizim Loglari</h3>
+        <div class="stream-status" [class.connected]="isConnected()" [class.disconnected]="!isConnected()">
+          <span class="pulse-dot"></span>
+          <span class="status-text">{{ isConnected() ? 'Jonli ulanish faol' : 'Ulanmoqda...' }}</span>
+        </div>
+      </div>
+      <p class="logs-subtitle">Userbot va AI xizmatlarining real-vaqtdagi jarayonlarini kuzatish</p>
+    </div>
+
+    <div class="header-right">
+      <div class="stats-pills">
+        <span class="stat-pill total" title="Jami xotiradagi loglar">
+          Jami: <strong>{{ logs().length }}</strong>
+        </span>
+        <span *ngIf="errorCount() > 0" class="stat-pill error" title="Xatoliklar">
+          Xatolar: <strong>{{ errorCount() }}</strong>
+        </span>
+        <span *ngIf="warnCount() > 0" class="stat-pill warn" title="Ogohlantirishlar">
+          Ogohlantirish: <strong>{{ warnCount() }}</strong>
+        </span>
+      </div>
+
+      <div class="action-buttons">
+        <button
+          type="button"
+          class="btn-tool"
+          [class.active]="autoScroll()"
+          (click)="toggleAutoScroll()"
+          title="Avtomatik pastga tushish"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+          <span>Avto-skroll</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-tool"
+          (click)="fetchInitialLogs()"
+          [disabled]="isLoading()"
+          title="Qayta yuklash"
+        >
+          <svg class="w-4 h-4" [class.animate-spin]="isLoading()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Yangilash</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-tool danger"
+          (click)="clearLogs()"
+          title="Loglarni tozalash"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span>Tozalash</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="logs-toolbar">
+    <div class="search-box">
+      <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input
+        type="text"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Loglar bo'yicha qidirish..."
+        class="search-input"
+      />
+    </div>
+
+    <div class="filters-row">
+      <div class="filter-group">
+        <span class="filter-label">Daraja:</span>
+        <div class="filter-pills">
+          <button
+            type="button"
+            class="pill"
+            [class.active]="selectedLevel() === 'all'"
+            (click)="selectedLevel.set('all')"
+          >
+            Barchasi
+          </button>
+          <button
+            type="button"
+            class="pill info"
+            [class.active]="selectedLevel() === 'info'"
+            (click)="selectedLevel.set('info')"
+          >
+            Info
+          </button>
+          <button
+            type="button"
+            class="pill success"
+            [class.active]="selectedLevel() === 'success'"
+            (click)="selectedLevel.set('success')"
+          >
+            Muvaffaqiyat
+          </button>
+          <button
+            type="button"
+            class="pill warn"
+            [class.active]="selectedLevel() === 'warn'"
+            (click)="selectedLevel.set('warn')"
+          >
+            Ogoh
+          </button>
+          <button
+            type="button"
+            class="pill error"
+            [class.active]="selectedLevel() === 'error'"
+            (click)="selectedLevel.set('error')"
+          >
+            Xato
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Toifa:</span>
+        <select
+          [ngModel]="selectedCategory()"
+          (ngModelChange)="selectedCategory.set($event)"
+          class="category-select"
+        >
+          <option value="all">Barcha toifalar</option>
+          <option value="telegram">Telegram</option>
+          <option value="groq">Groq AI</option>
+          <option value="forward">Guruhlar (Forward)</option>
+          <option value="system">Tizim (System)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="terminal-container" #logContainer>
+    <div *ngIf="filteredLogs().length === 0" class="terminal-empty">
+      <span class="empty-icon">📂</span>
+      <p class="empty-text">Hozircha ko'rsatish uchun loglar mavjud emas</p>
+      <span class="empty-sub">Telegram kanalga test xabar yuborib ko'ring yoki filtrlarni o'zgartiring</span>
+    </div>
+
+    <div *ngFor="let log of filteredLogs()" class="log-line" [ngClass]="'level-' + log.level">
+      <span class="log-time">{{ formatTime(log.timestamp) }}</span>
+      <span class="log-badge level-badge" [ngClass]="'badge-' + log.level">
+        {{ log.level.toUpperCase() }}
+      </span>
+      <span class="log-badge category-badge" [ngClass]="'cat-' + log.category">
+        {{ log.category.toUpperCase() }}
+      </span>
+      <span class="log-message">{{ log.message }}</span>
+      <span *ngIf="log.details" class="log-details">
+        {{ log.details | json }}
+      </span>
+    </div>
+  </div>
+</div>

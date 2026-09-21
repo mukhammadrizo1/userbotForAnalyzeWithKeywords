@@ -7,6 +7,11 @@ import { BadgeComponent } from '../../../../components/ui/badge/badge.component'
 import { DialogComponent } from '../../../../components/ui/dialog/dialog.component';
 import { ConfirmModalComponent } from '../../../../components/ui/confirm-modal/confirm-modal.component';
 
+export interface ChannelItem {
+  ident: string;
+  isJoined?: boolean;
+}
+
 @Component({
   selector: 'app-channels',
   standalone: true,
@@ -23,14 +28,20 @@ import { ConfirmModalComponent } from '../../../../components/ui/confirm-modal/c
   styleUrl: './channels.component.css',
 })
 export class ChannelsComponent {
-  @Input() set channels(val: string[]) {
-    this._channels.set(val || []);
+  @Input() set channels(val: any[]) {
+    const list: ChannelItem[] = (val || []).map((item) => {
+      if (typeof item === 'string') {
+        return { ident: item, isJoined: undefined };
+      }
+      return { ident: item.ident || item.name || '', isJoined: item.isJoined };
+    });
+    this._channels.set(list);
   }
   @Output() addChannel = new EventEmitter<string>();
   @Output() updateChannel = new EventEmitter<any>();
   @Output() deleteChannel = new EventEmitter<string>();
 
-  _channels = signal<string[]>([]);
+  _channels = signal<ChannelItem[]>([]);
   searchQuery = signal<string>('');
 
   addModalOpen = signal<boolean>(false);
@@ -46,7 +57,7 @@ export class ChannelsComponent {
     const q = this.searchQuery().toLowerCase().trim();
     const list = this._channels();
     if (!q) return list;
-    return list.filter((c) => (c || '').toLowerCase().includes(q));
+    return list.filter((c) => (c.ident || '').toLowerCase().includes(q));
   });
 
   openAddModal(): void {
@@ -61,14 +72,16 @@ export class ChannelsComponent {
     this.addModalOpen.set(false);
   }
 
-  openDetail(channel: string): void {
-    this.selectedChannel.set(channel);
+  openDetail(channel: string | ChannelItem): void {
+    const ident = typeof channel === 'string' ? channel : channel.ident;
+    this.selectedChannel.set(ident);
     this.detailModalOpen.set(true);
   }
 
-  openEdit(channel: string): void {
-    this.selectedChannel.set(channel);
-    this.editChannelInput.set(channel);
+  openEdit(channel: string | ChannelItem): void {
+    const ident = typeof channel === 'string' ? channel : channel.ident;
+    this.selectedChannel.set(ident);
+    this.editChannelInput.set(ident);
     this.detailModalOpen.set(false);
     this.editModalOpen.set(true);
   }
@@ -84,8 +97,9 @@ export class ChannelsComponent {
     this.editModalOpen.set(false);
   }
 
-  promptDelete(channel: string, fromDetail: boolean = false): void {
-    this.selectedChannel.set(channel);
+  promptDelete(channel: string | ChannelItem, fromDetail: boolean = false): void {
+    const ident = typeof channel === 'string' ? channel : channel.ident;
+    this.selectedChannel.set(ident);
     if (fromDetail) {
       this.detailModalOpen.set(false);
     }

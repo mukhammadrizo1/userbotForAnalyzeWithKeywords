@@ -38,7 +38,19 @@
       <div class="channel-meta" (click)="openDetail(ch)">
         <div class="channel-icon">📢</div>
         <div class="channel-info">
-          <span class="channel-name" [title]="ch">{{ ch }}</span>
+          <div class="channel-header-row">
+            <span class="channel-name" [title]="ch.ident">{{ ch.ident }}</span>
+            <span
+              *ngIf="ch.isJoined !== undefined"
+              class="membership-badge"
+              [class.joined]="ch.isJoined"
+              [class.not-joined]="!ch.isJoined"
+              [title]="ch.isJoined ? 'Userbot ushbu kanalga a\'zo' : 'Userbot bu kanalga hali a\'zo bo\'lmagan'"
+            >
+              <span class="status-dot-mini"></span>
+              {{ ch.isJoined ? "A'zo bo'lingan" : "A'zo bo'linmagan" }}
+            </span>
+          </div>
           <span class="channel-sub">Monitoring faol</span>
         </div>
       </div>

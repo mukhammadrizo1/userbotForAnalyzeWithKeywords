@@ -177,13 +177,22 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async markAsSent(uniqueId: string, text?: string, sentiment?: string, channel?: string, status?: string): Promise<void> {
     try {
       await this.query(
-        'INSERT INTO history (msg_unique_id, text, sentiment, channel, status) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (msg_unique_id) DO NOTHING',
+        `INSERT INTO history (msg_unique_id, text, sentiment, channel, status)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (msg_unique_id) DO UPDATE SET
+           text = COALESCE(EXCLUDED.text, history.text),
+           sentiment = COALESCE(EXCLUDED.sentiment, history.sentiment),
+           channel = COALESCE(EXCLUDED.channel, history.channel),
+           status = COALESCE(EXCLUDED.status, history.status),
+           date_added = CURRENT_TIMESTAMP`,
         [uniqueId, text || null, sentiment || null, channel || null, status || null],
       );
       await this.query(
         'DELETE FROM history WHERE msg_unique_id NOT IN (SELECT msg_unique_id FROM history ORDER BY date_added DESC LIMIT 1000)',
       );
-    } catch {}
+    } catch (err: any) {
+      console.error('Bazada history saqlashda xatolik:', err?.message || err);
+    }
   }
 
   async getRecentHistory(limit: number = 50): Promise<any[]> {

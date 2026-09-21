@@ -1,6 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Sse, MessageEvent } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { DatabaseService } from '../database/database.service';
 import { UserbotService } from '../userbot/userbot.service';
+import { LoggerService } from '../logger/logger.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('api')
@@ -8,6 +11,7 @@ export class ApiController {
   constructor(
     private readonly db: DatabaseService,
     private readonly userbot: UserbotService,
+    private readonly logger: LoggerService,
   ) {}
 
   @Get('ping')
@@ -29,7 +33,13 @@ export class ApiController {
   @Get('channels')
   async getChannels(): Promise<any> {
     const channels = await this.db.getChannels();
-    return { channels };
+    let channelDetails: any[] = [];
+    try {
+      channelDetails = await this.userbot.getChannelsWithStatus();
+    } catch {
+      channelDetails = channels.map((c: string) => ({ ident: c, isJoined: false }));
+    }
+    return { channels, channelDetails };
   }
 
   @UseGuards(AuthGuard)
@@ -84,7 +94,13 @@ export class ApiController {
   @UseGuards(AuthGuard)
   @Get('groups')
   async getGroups(@Query('type') type?: string): Promise<any> {
-    const groups = await this.db.getGroups(type);
+    const rawGroups = await this.db.getGroups(type);
+    let groups: any[] = rawGroups;
+    try {
+      groups = await this.userbot.getGroupsWithStatus(type);
+    } catch {
+      groups = rawGroups.map((g: any) => ({ ...g, isJoined: false }));
+    }
     return { groups };
   }
 
@@ -169,5 +185,30 @@ export class ApiController {
   @Post('telegram/auto-join')
   async autoJoinTelegramChannels(): Promise<any> {
     return this.userbot.autoJoinChannels();
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('logs')
+  getLogs(@Query('limit') limit?: string, @Query('sinceId') sinceId?: string): any {
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
+    const parsedSinceId = sinceId ? parseInt(sinceId, 10) : undefined;
+    return {
+      logs: this.logger.getLogs(parsedLimit, parsedSinceId),
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('logs')
+  clearLogs(): any {
+    this.logger.clearLogs();
+    return { success: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Sse('logs/stream')
+  streamLogs(): Observable<MessageEvent> {
+    return this.logger.getStream().pipe(
+      map((entry) => ({ data: entry } as MessageEvent)),
+    );
   }
 }

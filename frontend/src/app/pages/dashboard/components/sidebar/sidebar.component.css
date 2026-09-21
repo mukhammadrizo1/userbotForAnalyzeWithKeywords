@@ -248,10 +248,24 @@
   flex-shrink: 0;
 }
 
+.nav-badge.live-dot-badge {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  font-size: 0.55rem;
+  padding: 0.1rem 0.35rem;
+  line-height: 1;
+}
+
 .nav-item.active .nav-badge {
   background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
   border-color: transparent;
+}
+
+.nav-item.active .nav-badge.live-dot-badge {
+  background: rgba(16, 185, 129, 0.3);
+  color: #34d399;
 }
 
 .sidebar-footer {

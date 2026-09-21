@@ -117,4 +117,20 @@ export class ApiService {
   autoJoinTelegramChannels(): Observable<any> {
     return this.http.post<any>(`${this.base}/telegram/auto-join`, {});
   }
+
+  getLogs(limit: number = 100, sinceId?: number): Observable<any> {
+    let url = `${this.base}/logs?limit=${limit}`;
+    if (sinceId) {
+      url += `&sinceId=${sinceId}`;
+    }
+    return this.http.get<any>(url);
+  }
+
+  clearLogs(): Observable<any> {
+    return this.http.delete<any>(`${this.base}/logs`);
+  }
+
+  getLogsStreamUrl(): string {
+    return `${this.base}/logs/stream`;
+  }
 }

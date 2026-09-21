@@ -42,6 +42,7 @@
               <span *ngSwitchCase="'keywords'">Qidiruv Kalit So'zlari</span>
               <span *ngSwitchCase="'groups'">Guruhlar & Yo'naltirish</span>
               <span *ngSwitchCase="'history'">Tahlil Tarixi</span>
+              <span *ngSwitchCase="'logs'">Jonli Tizim Loglari</span>
               <span *ngSwitchCase="'system'">Tizim & AI Holati</span>
               <span *ngSwitchDefault>Boshqaruv Paneli</span>
             </ng-container>
@@ -52,6 +53,7 @@
               <span *ngSwitchCase="'keywords'">Postlarda AI tahlilini faollashtiruvchi kalit iboralar</span>
               <span *ngSwitchCase="'groups'">Tahlil natijalariga ko'ra xabarlar yo'naltiriladigan guruhlar</span>
               <span *ngSwitchCase="'history'">Groq AI tahlilidan o'tgan so'nggi 50 ta xabarlar arxivi</span>
+              <span *ngSwitchCase="'logs'">Userbot va AI xizmatlarining real-vaqtdagi jarayonlarini kuzatish</span>
               <span *ngSwitchCase="'system'">Telegram MTProto va Groq Llama 3 tizim holati parametrlari</span>
               <span *ngSwitchDefault>UTY Monitoring va AI filtr boshqaruvi</span>
             </ng-container>
@@ -119,6 +121,10 @@
         [status]="status()"
         (statusChanged)="refreshAll()"
       ></app-system-status>
+
+      <app-logs
+        *ngIf="activeSection() === 'logs'"
+      ></app-logs>
     </main>
   </div>
 </div>

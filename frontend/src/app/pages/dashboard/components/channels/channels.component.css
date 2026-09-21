@@ -105,6 +105,14 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 0.25rem;
+}
+
+.channel-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .channel-name {
@@ -116,9 +124,47 @@
   text-overflow: ellipsis;
 }
 
+.membership-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.45rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
+.membership-badge .status-dot-mini {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.membership-badge.joined {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.membership-badge.joined .status-dot-mini {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.membership-badge.not-joined {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.membership-badge.not-joined .status-dot-mini {
+  background: #f59e0b;
+}
+
 .channel-sub {
   font-size: 0.6875rem;
-  color: #10b981;
+  color: #64748b;
 }
 
 .channel-actions {

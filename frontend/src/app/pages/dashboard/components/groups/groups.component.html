@@ -31,7 +31,19 @@
       </div>
       <div class="items-list">
         <div *ngFor="let g of goodGroups()" class="group-row">
-          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="group-info-wrap">
+            <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+            <span
+              *ngIf="g.isJoined !== undefined"
+              class="membership-badge"
+              [class.joined]="g.isJoined"
+              [class.not-joined]="!g.isJoined"
+              [title]="g.isJoined ? 'Userbot ushbu guruhga a\'zo' : 'Userbot bu guruhga hali a\'zo bo\'lmagan'"
+            >
+              <span class="status-dot-mini"></span>
+              {{ g.isJoined ? "A'zo" : "A'zo emas" }}
+            </span>
+          </div>
           <div class="row-actions">
             <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,7 +76,19 @@
       </div>
       <div class="items-list">
         <div *ngFor="let g of badGroups()" class="group-row">
-          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="group-info-wrap">
+            <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+            <span
+              *ngIf="g.isJoined !== undefined"
+              class="membership-badge"
+              [class.joined]="g.isJoined"
+              [class.not-joined]="!g.isJoined"
+              [title]="g.isJoined ? 'Userbot ushbu guruhga a\'zo' : 'Userbot bu guruhga hali a\'zo bo\'lmagan'"
+            >
+              <span class="status-dot-mini"></span>
+              {{ g.isJoined ? "A'zo" : "A'zo emas" }}
+            </span>
+          </div>
           <div class="row-actions">
             <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,7 +121,19 @@
       </div>
       <div class="items-list">
         <div *ngFor="let g of neutralGroups()" class="group-row">
-          <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+          <div class="group-info-wrap">
+            <span class="group-id" (click)="openDetail(g)" [title]="'Tafsilotlar: ' + g.group_id">{{ g.group_id }}</span>
+            <span
+              *ngIf="g.isJoined !== undefined"
+              class="membership-badge"
+              [class.joined]="g.isJoined"
+              [class.not-joined]="!g.isJoined"
+              [title]="g.isJoined ? 'Userbot ushbu guruhga a\'zo' : 'Userbot bu guruhga hali a\'zo bo\'lmagan'"
+            >
+              <span class="status-dot-mini"></span>
+              {{ g.isJoined ? "A'zo" : "A'zo emas" }}
+            </span>
+          </div>
           <div class="row-actions">
             <button class="btn-icon edit" (click)="openEdit(g)" title="Tahrirlash">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

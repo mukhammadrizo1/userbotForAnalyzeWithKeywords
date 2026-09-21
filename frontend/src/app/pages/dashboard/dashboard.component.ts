@@ -11,6 +11,7 @@ import { KeywordsComponent } from './components/keywords/keywords.component';
 import { GroupsComponent } from './components/groups/groups.component';
 import { HistoryComponent } from './components/history/history.component';
 import { SystemStatusComponent } from './components/system-status/system-status.component';
+import { LogsComponent } from './components/logs/logs.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -26,6 +27,7 @@ import { SystemStatusComponent } from './components/system-status/system-status.
     GroupsComponent,
     HistoryComponent,
     SystemStatusComponent,
+    LogsComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
@@ -38,7 +40,7 @@ export class DashboardComponent implements OnInit {
   loading = signal<boolean>(false);
   toast = signal<any>(null);
 
-  channels = signal<string[]>([]);
+  channels = signal<any[]>([]);
   keywords = signal<string[]>([]);
   groups = signal<any[]>([]);
   history = signal<any[]>([]);
@@ -83,7 +85,10 @@ export class DashboardComponent implements OnInit {
 
   loadChannels(): void {
     this.api.getChannels().subscribe({
-      next: (res: any) => this.channels.set(res.channels || []),
+      next: (res: any) => {
+        const list = res.channelDetails || res.channels || [];
+        this.channels.set(list);
+      },
       error: () => this.showToast('Kanallarni yuklashda xatolik', 'error'),
     });
   }
