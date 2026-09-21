@@ -647,11 +647,10 @@ Javob faqat bitta so'z bo'lsin.`;
     const candidateModels = [
       this.activeGroqModel,
       process.env.GROQ_MODEL,
-      'llama-3.1-8b-instant',
-      'llama-3.3-70b-versatile',
-      'llama3-8b-8192',
-      'mixtral-8x7b-32768',
-      'gemma2-9b-it',
+      'qwen/qwen3.8-27b',
+      'groq/compound-mini',
+      'groq/compound',
+      'openai/gpt-oss-120b',
     ].filter((m, idx, arr) => m && arr.indexOf(m) === idx) as string[];
 
     for (const model of candidateModels) {
@@ -709,7 +708,7 @@ Javob faqat bitta so'z bo'lsin.`;
       botUser: this.botInfo,
       groqReady: this.groqClients.length > 0,
       groqKeysCount: this.groqClients.length,
-      groqModel: this.activeGroqModel || process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      groqModel: this.activeGroqModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
       uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
       stats: counts,
     };
