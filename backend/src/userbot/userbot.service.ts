@@ -2,9 +2,18 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { NewMessage } from 'telegram/events';
+import { EditedMessage } from 'telegram/events/EditedMessage';
 import Groq from 'groq-sdk';
 import { DatabaseService } from '../database/database.service';
 import { LoggerService } from '../logger/logger.service';
+
+export interface ChannelCacheEntry {
+  id: string;
+  markedId: string;
+  username?: string;
+  title?: string;
+  dbIdent?: string;
+}
 
 @Injectable()
 export class UserbotService implements OnModuleInit {
@@ -16,6 +25,9 @@ export class UserbotService implements OnModuleInit {
   private botInfo: any = null;
   private startTime = Date.now();
   private authClients: Map<string, any> = new Map();
+  private channelCache: Map<string, ChannelCacheEntry> = new Map();
+  private isCacheRefreshing = false;
+  private cacheRefreshTimer: any = null;
 
   constructor(
     private readonly db: DatabaseService,
@@ -100,7 +112,13 @@ export class UserbotService implements OnModuleInit {
       this.isConnected = true;
       this.logger.success('telegram', `Telegram userbot muvaffaqiyatli ulandi: ${this.botInfo.firstName} (@${this.botInfo.username || this.botInfo.phone || this.botInfo.id})`);
 
+      await this.refreshDialogsAndChannelsCache();
       this.registerHandlers();
+
+      if (this.cacheRefreshTimer) clearInterval(this.cacheRefreshTimer);
+      this.cacheRefreshTimer = setInterval(() => {
+        this.refreshDialogsAndChannelsCache().catch(() => {});
+      }, 15 * 60 * 1000);
     } catch (err: any) {
       this.logger.error('telegram', `Telegram ulanish xatosi: ${err?.message || err}`);
       console.error('Telegram ulanish xatosi:', err?.message || err);
@@ -121,6 +139,85 @@ export class UserbotService implements OnModuleInit {
     ];
   }
 
+  cacheChannelEntry(entry: ChannelCacheEntry) {
+    if (entry.id) {
+      this.channelCache.set(entry.id, entry);
+      this.channelCache.set(`-${entry.id}`, entry);
+    }
+    if (entry.markedId) {
+      this.channelCache.set(entry.markedId, entry);
+    }
+    if (entry.username) {
+      const u = entry.username.toLowerCase().trim();
+      this.channelCache.set(u, entry);
+      this.channelCache.set(`@${u}`, entry);
+    }
+    if (entry.dbIdent) {
+      const clean = entry.dbIdent.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+      this.channelCache.set(clean, entry);
+      this.channelCache.set(`@${clean}`, entry);
+    }
+  }
+
+  async resolveAndCacheChannel(ident: string): Promise<ChannelCacheEntry | null> {
+    if (!this.client || !this.isConnected) return null;
+    const clean = ident.replace('https://t.me/', '').replace('@', '').trim();
+    if (!clean) return null;
+    try {
+      const ent: any = await this.client.getEntity(clean);
+      if (ent && ent.id) {
+        const id = ent.id.toString();
+        const username = (ent.username || '').toLowerCase().trim();
+        const title = ent.title || username || clean;
+        const entry: ChannelCacheEntry = {
+          id,
+          markedId: id.startsWith('-100') ? id : `-100${id}`,
+          username: username || undefined,
+          title,
+          dbIdent: ident,
+        };
+        this.cacheChannelEntry(entry);
+        return entry;
+      }
+    } catch { }
+    return null;
+  }
+
+  async refreshDialogsAndChannelsCache(): Promise<void> {
+    if (!this.client || !this.isConnected || this.isCacheRefreshing) return;
+    this.isCacheRefreshing = true;
+    try {
+      const dialogs = await this.client.getDialogs({ limit: 1000 });
+      for (const d of dialogs) {
+        const entity = d.entity;
+        const rawId = d.id?.toString() || entity?.id?.toString();
+        if (!rawId) continue;
+        const digits = rawId.replace(/[^0-9]/g, '');
+        const username = (entity?.username || '').toLowerCase().trim();
+        const title = d.title || entity?.title || username || rawId;
+        const entry: ChannelCacheEntry = {
+          id: digits,
+          markedId: `-100${digits}`,
+          username: username || undefined,
+          title,
+        };
+        this.cacheChannelEntry(entry);
+      }
+
+      const dbChannels = await this.db.getChannels();
+      for (const ch of dbChannels) {
+        const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+        if (!this.channelCache.has(clean) && !this.channelCache.has(`@${clean}`)) {
+          await this.resolveAndCacheChannel(ch);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn('telegram', `Kanallar keshini yangilashda ogohlantirish: ${err?.message || err}`);
+    } finally {
+      this.isCacheRefreshing = false;
+    }
+  }
+
   private registerHandlers() {
     if (!this.client) return;
 
@@ -138,7 +235,18 @@ export class UserbotService implements OnModuleInit {
         this.logger.error('telegram', `Xabarni qayta ishlashda kutilmagan xatolik: ${err?.message || err}`);
       }
     }, new NewMessage({}));
-    this.logger.info('telegram', 'Xabarlarni tinglash xizmati (NewMessage) faollashtirildi');
+
+    this.client.addEventHandler(async (event: any) => {
+      try {
+        const message = event.message;
+        if (!message) return;
+        await this.handleIncomingMessage(event);
+      } catch (err: any) {
+        this.logger.error('telegram', `Tahrirlangan xabarni qayta ishlashda xatolik: ${err?.message || err}`);
+      }
+    }, new EditedMessage({}));
+
+    this.logger.info('telegram', 'Xabarlarni tinglash xizmati (NewMessage + EditedMessage) faollashtirildi');
   }
 
   private async handleOutgoingCommand(event: any) {
@@ -236,6 +344,32 @@ export class UserbotService implements OnModuleInit {
     if (!text) return;
 
     const rawChatId = event.chatId ? event.chatId.toString() : '';
+    const peerChannelId = msg.peerId?.channelId ? msg.peerId.channelId.toString() : '';
+    const peerChatId = msg.peerId?.chatId ? msg.peerId.chatId.toString() : '';
+
+    // 1. Look up in cache or resolve entity
+    let cached = this.channelCache.get(rawChatId) ||
+      (peerChannelId ? this.channelCache.get(peerChannelId) : null) ||
+      (peerChannelId ? this.channelCache.get(`-100${peerChannelId}`) : null);
+
+    if (!cached && (peerChannelId || rawChatId)) {
+      try {
+        const entity: any = await this.client.getEntity(msg.peerId || event.chatId);
+        if (entity && entity.id) {
+          const id = entity.id.toString();
+          const u = (entity.username || '').toLowerCase().trim();
+          const title = entity.title || u || rawChatId;
+          cached = {
+            id,
+            markedId: id.startsWith('-100') ? id : `-100${id}`,
+            username: u || undefined,
+            title,
+          };
+          this.cacheChannelEntry(cached);
+        }
+      } catch (e: any) { }
+    }
+
     let chat = event.chat;
     if (!chat && typeof event.getChat === 'function') {
       try {
@@ -243,11 +377,10 @@ export class UserbotService implements OnModuleInit {
       } catch { }
     }
 
-    const peerChannelId = msg.peerId?.channelId ? msg.peerId.channelId.toString() : '';
-    const peerChatId = msg.peerId?.chatId ? msg.peerId.chatId.toString() : '';
     const chatEntityId = chat?.id ? chat.id.toString() : '';
-    const username = (chat?.username || '').toLowerCase().trim();
-    const chatTitle = chat?.title || (username ? `@${username}` : null) || rawChatId || 'Noma\'lum chat';
+    const username = (cached?.username || chat?.username || '').toLowerCase().trim();
+    const chatTitle = cached?.title || chat?.title || (username ? `@${username}` : null) || rawChatId || 'Noma\'lum chat';
+    const effectiveChatId = rawChatId || (peerChannelId ? `-100${peerChannelId}` : (cached?.markedId || chatEntityId));
 
     const targetChannels = await this.db.getChannels();
     if (!targetChannels || targetChannels.length === 0) return;
@@ -258,6 +391,8 @@ export class UserbotService implements OnModuleInit {
     if (peerChannelId) this.getNormalizedIdVariants(peerChannelId).forEach((v) => incomingVariants.add(v));
     if (peerChatId) this.getNormalizedIdVariants(peerChatId).forEach((v) => incomingVariants.add(v));
     if (chatEntityId) this.getNormalizedIdVariants(chatEntityId).forEach((v) => incomingVariants.add(v));
+    if (cached?.id) this.getNormalizedIdVariants(cached.id).forEach((v) => incomingVariants.add(v));
+    if (cached?.markedId) this.getNormalizedIdVariants(cached.markedId).forEach((v) => incomingVariants.add(v));
     if (username) {
       incomingVariants.add(username);
       incomingVariants.add(`@${username}`);
@@ -266,6 +401,17 @@ export class UserbotService implements OnModuleInit {
     let matchedChannel: string | null = null;
     for (const ch of targetChannels) {
       const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+      // A. Match username
+      if (username && (clean === username || `@${clean}` === `@${username}`)) {
+        matchedChannel = ch;
+        break;
+      }
+      // B. Match cached entity
+      if (cached && (clean === cached.id || clean === cached.markedId || clean === cached.dbIdent?.toLowerCase())) {
+        matchedChannel = ch;
+        break;
+      }
+      // C. Match incoming variants
       if (incomingVariants.has(clean)) {
         matchedChannel = ch;
         break;
@@ -275,19 +421,31 @@ export class UserbotService implements OnModuleInit {
         matchedChannel = ch;
         break;
       }
+      // D. Match via cache lookup for clean
+      const chCached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
+      if (chCached && (incomingVariants.has(chCached.id) || incomingVariants.has(chCached.markedId))) {
+        matchedChannel = ch;
+        break;
+      }
     }
 
     if (!matchedChannel) {
+      // If it's a channel, supergroup, or chat, log so user can see it in live logs
+      if (peerChannelId || rawChatId.startsWith('-100') || event.isChannel) {
+        this.logger.info(
+          'telegram',
+          `Kanal/Guruhdan xabar keldi (kuzatuvda emas): "${chatTitle}" (ID: ${effectiveChatId}${username ? `, @${username}` : ''})`,
+          { preview: text.slice(0, 80) },
+        );
+      }
       return;
     }
 
     this.logger.info(
       'telegram',
-      `Kuzatilayotgan kanaldan yangi xabar keldi: "${chatTitle}" (Mos kanal: ${matchedChannel})`,
-      { preview: text.slice(0, 120), chatId: rawChatId || chatEntityId },
+      `🎯 Kuzatilayotgan kanaldan yangi xabar: "${chatTitle}" (Bazada: ${matchedChannel})`,
+      { preview: text.slice(0, 120), chatId: effectiveChatId },
     );
-
-    const effectiveChatId = rawChatId || (peerChannelId ? `-100${peerChannelId}` : chatEntityId);
 
     if (msg.groupedId) {
       const gid = msg.groupedId.toString();
@@ -361,7 +519,7 @@ export class UserbotService implements OnModuleInit {
     if (!foundKw) {
       this.logger.info(
         'telegram',
-        `Xabarda kalit so'zlar topilmadi: "${text.slice(0, 60)}..." (Bazada ${keywords.length} ta kalit so'z bor)`,
+        `Xabarda kalit so'zlar topilmadi: "${text.slice(0, 60)}..." (Bazada ${keywords.length} ta kalit so'z bor) | Kanal: "${channelName}"`,
       );
       return;
     }
@@ -403,14 +561,22 @@ export class UserbotService implements OnModuleInit {
 
     let sentCount = 0;
     for (const target of targetGroups) {
-      const destId = target.group_id;
+      const destId = target.group_id.trim();
       try {
-        let destination: any = destId;
-        if (/^-?\d+$/.test(destId.trim())) {
+        // Resolve destination entity from cache or MTProto
+        const cachedGroup = this.channelCache.get(destId) ||
+          this.channelCache.get(`-100${destId.replace(/^-100/, '')}`) ||
+          this.channelCache.get(destId.replace(/^-100/, ''));
+        const effectiveDestId = cachedGroup?.markedId || destId;
+
+        let destination: any = effectiveDestId;
+        try {
+          destination = await this.client.getInputEntity(effectiveDestId);
+        } catch {
           try {
-            destination = await this.client.getInputEntity(destId.trim());
+            destination = await this.client.getInputEntity(destId);
           } catch {
-            destination = destId.trim();
+            destination = effectiveDestId;
           }
         }
 
@@ -461,7 +627,10 @@ export class UserbotService implements OnModuleInit {
   }
 
   private async analyzeContentSmart(text: string): Promise<string> {
-    if (!this.groqClients || this.groqClients.length === 0) return 'ERROR';
+    if (!this.groqClients || this.groqClients.length === 0) {
+      this.logger.error('groq', 'Groq API kalitlari topilmadi (GROQ_API_KEY sozlanmagan)');
+      return 'ERROR';
+    }
 
     const systemPrompt = `Sen professional tahlilchisan. Senga Telegram xabarlari yuboriladi (O'zbek, Rus, Ingliz tilida).
 Vazifang: Matn 'O'zbekiston Temir Yo'llari' (UTY), uning poyezdlari (Afrosiyob, Sharq, Nasaf), vokzallari, chiptalari yoki xizmatlariga aloqadorligini aniqlash.
@@ -497,7 +666,8 @@ Javob faqat bitta so'z bo'lsin.`;
         if (result.includes('YOMON')) return 'YOMON';
         if (result.includes('NEYTRAL')) return 'NEYTRAL';
         return 'SKIP';
-      } catch {
+      } catch (err: any) {
+        this.logger.error('groq', `Groq tahlil xatosi (${model}): ${err?.message || err}`);
         continue;
       }
     }
@@ -661,17 +831,29 @@ Javob faqat bitta so'z bo'lsin.`;
       const joinedUsernamesOrIds = new Set<string>();
 
       for (const d of dialogs) {
-        if (d.id !== undefined && d.id !== null) {
-          const variants = this.getNormalizedIdVariants(d.id);
+        const entity = d.entity;
+        const rawId = d.id !== undefined && d.id !== null ? d.id.toString() : (entity?.id ? entity.id.toString() : '');
+        if (rawId) {
+          const variants = this.getNormalizedIdVariants(rawId);
           variants.forEach((v) => joinedUsernamesOrIds.add(v));
+          const digits = rawId.replace(/[^0-9]/g, '');
+          const username = (entity?.username || '').toLowerCase().trim();
+          const title = d.title || entity?.title || username || rawId;
+          const entry: ChannelCacheEntry = {
+            id: digits,
+            markedId: `-100${digits}`,
+            username: username || undefined,
+            title,
+          };
+          this.cacheChannelEntry(entry);
         }
-        if (d.entity) {
-          if (d.entity.id !== undefined && d.entity.id !== null) {
-            const variants = this.getNormalizedIdVariants(d.entity.id);
+        if (entity) {
+          if (entity.id !== undefined && entity.id !== null) {
+            const variants = this.getNormalizedIdVariants(entity.id);
             variants.forEach((v) => joinedUsernamesOrIds.add(v));
           }
-          if (d.entity.username) {
-            const u = d.entity.username.toLowerCase().trim();
+          if (entity.username) {
+            const u = entity.username.toLowerCase().trim();
             joinedUsernamesOrIds.add(u);
             joinedUsernamesOrIds.add(`@${u}`);
           }
@@ -681,13 +863,15 @@ Javob faqat bitta so'z bo'lsin.`;
       const channelDetails = dbChannels.map((ch: string) => {
         const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
         const idVariants = this.getNormalizedIdVariants(clean);
+        const cached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
         const isJoined =
           joinedUsernamesOrIds.has(clean) ||
           joinedUsernamesOrIds.has(`@${clean}`) ||
-          idVariants.some((v) => joinedUsernamesOrIds.has(v));
+          idVariants.some((v) => joinedUsernamesOrIds.has(v)) ||
+          Boolean(cached && (joinedUsernamesOrIds.has(cached.id) || joinedUsernamesOrIds.has(cached.markedId)));
         return {
           ident: ch,
-          isJoined,
+          isJoined: Boolean(isJoined),
         };
       });
 

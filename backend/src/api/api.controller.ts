@@ -46,6 +46,9 @@ export class ApiController {
   @Post('channels')
   async addChannel(@Body() body: any): Promise<any> {
     const ok = await this.db.addChannel(body.ident);
+    if (ok && body.ident) {
+      this.userbot.resolveAndCacheChannel(body.ident).catch(() => {});
+    }
     return { success: ok };
   }
 
@@ -53,6 +56,9 @@ export class ApiController {
   @Put('channels/:id')
   async updateChannel(@Param('id') id: string, @Body() body: any): Promise<any> {
     const ok = await this.db.updateChannel(id, body.newIdent);
+    if (ok && body.newIdent) {
+      this.userbot.resolveAndCacheChannel(body.newIdent).catch(() => {});
+    }
     return { success: ok };
   }
 
