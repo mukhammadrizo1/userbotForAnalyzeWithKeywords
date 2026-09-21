@@ -28,6 +28,7 @@ export class UserbotService implements OnModuleInit {
   private channelCache: Map<string, ChannelCacheEntry> = new Map();
   private isCacheRefreshing = false;
   private cacheRefreshTimer: any = null;
+  private activeGroqModel: string | null = null;
 
   constructor(
     private readonly db: DatabaseService,
@@ -643,32 +644,48 @@ QOIDALAR:
    - 'NEYTRAL' (Oddiy ma'lumot, savol)
 Javob faqat bitta so'z bo'lsin.`;
 
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const candidateModels = [
+      this.activeGroqModel,
+      process.env.GROQ_MODEL,
+      'llama-3.1-8b-instant',
+      'llama-3.3-70b-versatile',
+      'llama3-8b-8192',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx) as string[];
 
-    for (let attempt = 0; attempt < this.groqClients.length; attempt++) {
-      const client = this.groqClients[this.currentGroqIndex];
-      this.currentGroqIndex = (this.currentGroqIndex + 1) % this.groqClients.length;
+    for (const model of candidateModels) {
+      for (let attempt = 0; attempt < this.groqClients.length; attempt++) {
+        const client = this.groqClients[this.currentGroqIndex];
+        this.currentGroqIndex = (this.currentGroqIndex + 1) % this.groqClients.length;
 
-      try {
-        const completion = await client.chat.completions.create({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Matn: ${text}` },
-          ],
-          model,
-          temperature: 0,
-          max_tokens: 15,
-        });
+        try {
+          const completion = await client.chat.completions.create({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Matn: ${text}` },
+            ],
+            model,
+            temperature: 0,
+            max_tokens: 15,
+          });
 
-        const result = (completion.choices[0]?.message?.content || '').trim().toUpperCase();
-        if (result.includes('SKIP')) return 'SKIP';
-        if (result.includes('YAXSHI')) return 'YAXSHI';
-        if (result.includes('YOMON')) return 'YOMON';
-        if (result.includes('NEYTRAL')) return 'NEYTRAL';
-        return 'SKIP';
-      } catch (err: any) {
-        this.logger.error('groq', `Groq tahlil xatosi (${model}): ${err?.message || err}`);
-        continue;
+          this.activeGroqModel = model;
+          const result = (completion.choices[0]?.message?.content || '').trim().toUpperCase();
+          if (result.includes('SKIP')) return 'SKIP';
+          if (result.includes('YAXSHI')) return 'YAXSHI';
+          if (result.includes('YOMON')) return 'YOMON';
+          if (result.includes('NEYTRAL')) return 'NEYTRAL';
+          return 'SKIP';
+        } catch (err: any) {
+          const isModelNotFound = err?.status === 404 || (err?.message && err.message.includes('model_not_found'));
+          if (isModelNotFound) {
+            this.logger.warn('groq', `Model "${model}" topilmadi yoki ruxsat yo'q. Zaxira model bilan urinib ko'rilmoqda...`);
+            break; // Break inner loop to try next model in candidateModels
+          }
+          this.logger.error('groq', `Groq tahlil xatosi (${model}): ${err?.message || err}`);
+          continue;
+        }
       }
     }
     return 'ERROR';
@@ -692,7 +709,7 @@ Javob faqat bitta so'z bo'lsin.`;
       botUser: this.botInfo,
       groqReady: this.groqClients.length > 0,
       groqKeysCount: this.groqClients.length,
-      groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      groqModel: this.activeGroqModel || process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
       uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
       stats: counts,
     };
