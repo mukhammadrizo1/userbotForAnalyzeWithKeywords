@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://uty-userbot-backend.onrender.com',
+  apiUrl: 'https://userbotforanalyzewithkeywords.fly.dev',
 };

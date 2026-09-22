@@ -25,10 +25,10 @@ export class AuthService {
     if (typeof window !== 'undefined') {
       const host = window.location.hostname;
       if (host !== 'localhost' && host !== '127.0.0.1') {
-        return 'https://uty-userbot-backend.onrender.com';
+        return environment.apiUrl || 'https://userbotforanalyzewithkeywords.fly.dev';
       }
     }
-    return environment.apiUrl || 'https://uty-userbot-backend.onrender.com';
+    return environment.apiUrl || 'https://userbotforanalyzewithkeywords.fly.dev';
   }
 
   login(credentials: any): Observable<any> {
