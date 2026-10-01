@@ -43,7 +43,9 @@ export class UserbotService implements OnModuleInit {
 
   async onModuleInit() {
     this.initGroq();
-    await this.initTelegram();
+    this.initTelegram().catch((err: any) => {
+      this.logger.error('telegram', `Telegram initsializatsiyasida xatolik: ${err?.message || err}`);
+    });
   }
 
   private initGroq() {
