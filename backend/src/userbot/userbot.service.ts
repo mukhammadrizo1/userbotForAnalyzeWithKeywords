@@ -286,62 +286,68 @@ export class UserbotService implements OnModuleInit {
 
   private startFallbackPoller() {
     if (this.fallbackPollerTimer) clearInterval(this.fallbackPollerTimer);
+    let isPolling = false;
+
     this.fallbackPollerTimer = setInterval(async () => {
-      if (!this.client || !this.isConnected || this.cachedChannels.length === 0) return;
+      if (!this.client || !this.isConnected || isPolling || this.cachedChannels.length === 0) return;
+      isPolling = true;
+
       try {
-        const batchSize = 6;
-        const total = this.cachedChannels.length;
-        const channelsToPoll: string[] = [];
-        for (let i = 0; i < batchSize; i++) {
-          const ch = this.cachedChannels[this.pollerIndex % total];
-          this.pollerIndex = (this.pollerIndex + 1) % total;
-          if (ch) channelsToPoll.push(ch);
-        }
+        const dialogs = await this.client.getDialogs({ limit: 120 });
+        for (const d of dialogs) {
+          if (!d.isChannel && !d.isGroup) continue;
+          const msg = d.message;
+          if (!msg || !msg.id) continue;
 
-        await Promise.all(
-          channelsToPoll.map(async (ch) => {
-            const clean = this.db.cleanChannelInput(ch);
-            const cached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
-            const target = cached?.id ? (cached.id.startsWith('-100') ? cached.id : `-100${cached.id}`) : clean;
+          const rawId = d.id?.toString() || '';
+          const rawDigits = rawId.replace(/[^0-9]/g, '');
+          const trueChannelId = (rawDigits.startsWith('100') && rawDigits.length > 10) ? rawDigits.slice(3) : rawDigits;
+          const target = `-100${trueChannelId}`;
+          const ent: any = d.entity;
+          const username = (ent?.username || '').toLowerCase().trim();
 
-            const lastId = this.lastPolledMessageId.get(ch) || 0;
-            try {
-              const msgs = await this.client.getMessages(target, { limit: 5 });
-              if (msgs && msgs.length > 0) {
-                const maxId = Math.max(...msgs.map((m: any) => m.id || 0));
-                if (lastId === 0) {
-                  this.lastPolledMessageId.set(ch, maxId);
-                  return;
-                }
-                this.lastPolledMessageId.set(ch, Math.max(lastId, maxId));
-
-                for (const m of msgs) {
-                  if (m.id > lastId) {
-                    const text = (m.message || m.text || '').trim();
-                    if (!text) continue;
-                    const channelName = cached?.title || ch;
-                    const uniqueId = `${target}_msg_${m.id}`;
-                    if (this.processedMessageIds.has(uniqueId)) continue;
-
-                    this.logger.info(
-                      'telegram',
-                      `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${ch})`,
-                      { preview: text.slice(0, 120), chatId: target },
-                    );
-
-                    await this.sendFinal(target, [m], text, uniqueId, channelName);
-                  }
-                }
-              }
-            } catch {
-              // Ignore single channel errors
+          let isMonitored = false;
+          let matchedDbIdent = '';
+          for (const ch of this.cachedChannels) {
+            const clean = this.db.cleanChannelInput(ch).toLowerCase();
+            if (clean === username || clean === trueChannelId || clean === rawDigits || clean === target) {
+              isMonitored = true;
+              matchedDbIdent = ch;
+              break;
             }
-          }),
-        );
+          }
+          if (!isMonitored) continue;
+
+          const lastId = this.lastPolledMessageId.get(target) || 0;
+          if (lastId === 0) {
+            this.lastPolledMessageId.set(target, msg.id);
+            continue;
+          }
+
+          if (msg.id > lastId) {
+            this.lastPolledMessageId.set(target, msg.id);
+            const text = (msg.message || msg.text || '').trim();
+            if (!text) continue;
+
+            const channelName = d.title || username || matchedDbIdent;
+            const uniqueId = `${target}_msg_${msg.id}`;
+            if (this.processedMessageIds.has(uniqueId)) continue;
+
+            this.logger.info(
+              'telegram',
+              `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
+              { preview: text.slice(0, 120), chatId: target },
+            );
+
+            await this.sendFinal(target, [msg], text, uniqueId, channelName);
+          }
+        }
       } catch {
         // Poller cycle catch
+      } finally {
+        isPolling = false;
       }
-    }, 1500);
+    }, 7000);
   }
 
   private async handleOutgoingCommand(event: any) {
