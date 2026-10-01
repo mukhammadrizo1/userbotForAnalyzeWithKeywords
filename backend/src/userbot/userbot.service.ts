@@ -319,35 +319,37 @@ export class UserbotService implements OnModuleInit {
           if (!isMonitored) continue;
 
           const lastId = this.lastPolledMessageId.get(target) || 0;
+          const isRecent = msg.date && (Date.now() / 1000 - msg.date) < 600;
+
           if (lastId === 0) {
             this.lastPolledMessageId.set(target, msg.id);
+            if (!isRecent) continue;
+          } else if (msg.id <= lastId) {
             continue;
           }
 
-          if (msg.id > lastId) {
-            this.lastPolledMessageId.set(target, msg.id);
-            const text = (msg.message || msg.text || '').trim();
-            if (!text) continue;
+          this.lastPolledMessageId.set(target, Math.max(lastId, msg.id));
+          const text = (msg.message || msg.text || '').trim();
+          if (!text) continue;
 
-            const channelName = d.title || username || matchedDbIdent;
-            const uniqueId = `${target}_msg_${msg.id}`;
-            if (this.processedMessageIds.has(uniqueId)) continue;
+          const channelName = d.title || username || matchedDbIdent;
+          const uniqueId = `${target}_msg_${msg.id}`;
+          if (this.processedMessageIds.has(uniqueId)) continue;
 
-            this.logger.info(
-              'telegram',
-              `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
-              { preview: text.slice(0, 120), chatId: target },
-            );
+          this.logger.info(
+            'telegram',
+            `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
+            { preview: text.slice(0, 120), chatId: target },
+          );
 
-            await this.sendFinal(target, [msg], text, uniqueId, channelName);
-          }
+          await this.sendFinal(target, [msg], text, uniqueId, channelName);
         }
-      } catch {
-        // Poller cycle catch
+      } catch (err: any) {
+        this.logger.error('telegram', `Monitoring poller xatosi: ${err?.message || err}`);
       } finally {
         isPolling = false;
       }
-    }, 7000);
+    }, 5000);
   }
 
   private async handleOutgoingCommand(event: any) {
