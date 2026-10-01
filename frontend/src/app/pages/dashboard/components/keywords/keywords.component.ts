@@ -27,6 +27,7 @@ export class KeywordsComponent {
     this._keywords.set(val || []);
   }
   @Output() addKeyword = new EventEmitter<string>();
+  @Output() addBatchKeywords = new EventEmitter<string[]>();
   @Output() updateKeyword = new EventEmitter<any>();
   @Output() deleteKeyword = new EventEmitter<string>();
 
@@ -34,11 +35,13 @@ export class KeywordsComponent {
   searchQuery = signal<string>('');
 
   addModalOpen = signal<boolean>(false);
+  isBatchMode = signal<boolean>(false);
   editModalOpen = signal<boolean>(false);
   detailModalOpen = signal<boolean>(false);
   confirmModalOpen = signal<boolean>(false);
 
   newKeywordInput = signal<string>('');
+  batchKeywordInput = signal<string>('');
   selectedKeyword = signal<string>('');
   editKeywordInput = signal<string>('');
 
@@ -51,13 +54,27 @@ export class KeywordsComponent {
 
   openAddModal(): void {
     this.newKeywordInput.set('');
+    this.batchKeywordInput.set('');
+    this.isBatchMode.set(false);
     this.addModalOpen.set(true);
   }
 
   submitAdd(): void {
-    const val = this.newKeywordInput().trim();
-    if (!val) return;
-    this.addKeyword.emit(val);
+    if (this.isBatchMode()) {
+      const raw = this.batchKeywordInput().trim();
+      if (!raw) return;
+      const list = raw
+        .split(/[\n,]+/)
+        .map((x) => x.trim())
+        .filter((x) => x.length > 1);
+      if (list.length > 0) {
+        this.addBatchKeywords.emit(list);
+      }
+    } else {
+      const val = this.newKeywordInput().trim();
+      if (!val) return;
+      this.addKeyword.emit(val);
+    }
     this.addModalOpen.set(false);
   }
 

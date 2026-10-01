@@ -32,13 +32,17 @@ export class ApiController {
   @UseGuards(AuthGuard)
   @Get('channels')
   async getChannels(): Promise<any> {
-    const channels = await this.db.getChannels();
-    let channelDetails: any[] = [];
-    try {
-      channelDetails = await this.userbot.getChannelsWithStatus();
-    } catch {
-      channelDetails = channels.map((c: string) => ({ ident: c, isJoined: false }));
-    }
+    const detailed = await this.db.getChannelsDetailed();
+    const channels = detailed.map((c: any) => c.ident);
+    const channelDetails = detailed.map((c: any) => ({
+      ident: c.ident,
+      channelId: c.channel_id,
+      username: c.username,
+      title: c.title,
+      lastMsgId: c.last_msg_id,
+      lastCheckedAt: c.last_checked_at,
+      isJoined: true, // Bazadagi kanallar faol monitoring ostida
+    }));
     return { channels, channelDetails };
   }
 
@@ -50,6 +54,14 @@ export class ApiController {
       this.userbot.resolveAndCacheChannel(body.ident).catch(() => {});
     }
     return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('channels/batch')
+  async addChannelsBatch(@Body() body: { idents: string[] }): Promise<any> {
+    const res = await this.db.addChannelsBatch(body.idents || []);
+    this.userbot.refreshDialogsAndChannelsCache().catch(() => {});
+    return { success: true, ...res };
   }
 
   @UseGuards(AuthGuard)
@@ -81,6 +93,14 @@ export class ApiController {
   async addKeyword(@Body() body: any): Promise<any> {
     const ok = await this.db.addKeyword(body.word);
     return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('keywords/batch')
+  async addKeywordsBatch(@Body() body: { words: string[] }): Promise<any> {
+    const res = await this.db.addKeywordsBatch(body.words || []);
+    this.userbot.refreshDialogsAndChannelsCache().catch(() => {});
+    return { success: true, ...res };
   }
 
   @UseGuards(AuthGuard)
@@ -137,10 +157,16 @@ export class ApiController {
 
   @UseGuards(AuthGuard)
   @Get('history')
-  async getHistory(@Query('limit') limit?: string): Promise<any> {
+  async getHistory(@Query('limit') limit?: string, @Query('type') type?: string): Promise<any> {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
-    const history = await this.db.getRecentHistory(isNaN(parsedLimit) ? 50 : parsedLimit);
+    const history = await this.db.getRecentHistory(isNaN(parsedLimit) ? 50 : parsedLimit, type);
     return { history };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('history/:id/resend')
+  async resendHistoryItem(@Param('id') id: string, @Body() body: any): Promise<any> {
+    return this.userbot.resendHistoryItem(id, body?.overrideType);
   }
 
   @UseGuards(AuthGuard)
@@ -155,6 +181,24 @@ export class ApiController {
   async clearHistory(): Promise<any> {
     const ok = await this.db.clearHistory();
     return { success: ok };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('tester/analyze')
+  async testAi(@Body() body: { text: string }): Promise<any> {
+    return this.userbot.testAiContent(body?.text || '');
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('system/mode')
+  async getSystemMode(): Promise<any> {
+    return this.userbot.getSystemMode();
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('system/mode')
+  async setSystemMode(@Body() body: { isPaused?: boolean; isSimulationMode?: boolean }): Promise<any> {
+    return this.userbot.setSystemMode(body);
   }
 
   @UseGuards(AuthGuard)

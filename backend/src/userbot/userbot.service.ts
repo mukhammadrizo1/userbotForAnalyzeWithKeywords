@@ -28,6 +28,8 @@ export class UserbotService implements OnModuleInit {
   private channelCache: Map<string, ChannelCacheEntry> = new Map();
   private isCacheRefreshing = false;
   private cacheRefreshTimer: any = null;
+  private isPaused = false;
+  private isSimulationMode = false;
   private activeGroqModel: string | null = null;
   private cachedChannels: string[] = [];
   private cachedKeywords: string[] = [];
@@ -43,6 +45,12 @@ export class UserbotService implements OnModuleInit {
 
   async onModuleInit() {
     this.initGroq();
+    try {
+      const paused = await this.db.getSetting('system_paused');
+      this.isPaused = paused === 'true';
+      const sim = await this.db.getSetting('system_simulation');
+      this.isSimulationMode = sim === 'true';
+    } catch { }
     this.initTelegram().catch((err: any) => {
       this.logger.error('telegram', `Telegram initsializatsiyasida xatolik: ${err?.message || err}`);
     });
@@ -122,6 +130,7 @@ export class UserbotService implements OnModuleInit {
       this.logger.success('telegram', `Telegram userbot muvaffaqiyatli ulandi: ${this.botInfo.firstName} (@${this.botInfo.username || this.botInfo.phone || this.botInfo.id})`);
 
       await this.refreshDialogsAndChannelsCache();
+      await this.initChannelPointersAndCatchUp();
       this.registerHandlers();
       this.startFallbackPoller();
 
@@ -134,6 +143,24 @@ export class UserbotService implements OnModuleInit {
       console.error('Telegram ulanish xatosi:', err?.message || err);
       this.isConnected = false;
       this.botInfo = null;
+    }
+  }
+
+  private async initChannelPointersAndCatchUp(): Promise<void> {
+    try {
+      const detailed = await this.db.getChannelsDetailed();
+      for (const ch of detailed) {
+        const rawDigits = (ch.channel_id || ch.ident || '').replace(/[^0-9]/g, '');
+        const trueChannelId = (rawDigits.startsWith('100') && rawDigits.length > 10) ? rawDigits.slice(3) : rawDigits;
+        const target = trueChannelId ? `-100${trueChannelId}` : ch.ident;
+        const lastMsgId = Number(ch.last_msg_id) || 0;
+        if (lastMsgId > 0) {
+          this.lastPolledMessageId.set(target, lastMsgId);
+        }
+      }
+      this.logger.info('telegram', `Kanallarning bazadagi monitoring ko'rsatkichlari yuklandi (${detailed.length} ta kanal)`);
+    } catch (err: any) {
+      this.logger.warn('telegram', `Kanallar ko'rsatkichini yuklashda ogohlantirish: ${err?.message || err}`);
     }
   }
 
@@ -291,7 +318,7 @@ export class UserbotService implements OnModuleInit {
     let isPolling = false;
 
     this.fallbackPollerTimer = setInterval(async () => {
-      if (!this.client || !this.isConnected || isPolling || this.cachedChannels.length === 0) return;
+      if (!this.client || !this.isConnected || isPolling || this.cachedChannels.length === 0 || this.isPaused) return;
       isPolling = true;
 
       try {
@@ -327,28 +354,35 @@ export class UserbotService implements OnModuleInit {
 
           if (lastId === 0) {
             this.lastPolledMessageId.set(target, msg.id);
+            this.db.updateChannelProgress(matchedDbIdent, msg.id).catch(() => {});
             if (isRecent) {
               messagesToProcess.push(msg);
             }
           } else if (msg.id > lastId) {
-            this.lastPolledMessageId.set(target, msg.id);
             const gap = msg.id - lastId;
             if (gap === 1) {
               messagesToProcess.push(msg);
+              this.lastPolledMessageId.set(target, msg.id);
+              this.db.updateChannelProgress(matchedDbIdent, msg.id).catch(() => {});
             } else if (gap > 1) {
               // Oradagi xabarlar (ketma-ket tashlangan postlar) tushib qolmasligi uchun
               try {
-                const missed = await this.client.getMessages(target, { limit: Math.min(gap, 10) });
+                const missed = await this.client.getMessages(target, { limit: Math.min(gap, 15) });
                 if (missed && missed.length > 0) {
                   const sorted = [...missed]
                     .filter((m: any) => m && m.id && m.id > lastId)
                     .sort((a: any, b: any) => a.id - b.id);
                   messagesToProcess.push(...sorted);
+                  this.lastPolledMessageId.set(target, msg.id);
+                  this.db.updateChannelProgress(matchedDbIdent, msg.id).catch(() => {});
                 } else {
                   messagesToProcess.push(msg);
+                  this.lastPolledMessageId.set(target, msg.id);
+                  this.db.updateChannelProgress(matchedDbIdent, msg.id).catch(() => {});
                 }
-              } catch {
-                messagesToProcess.push(msg);
+              } catch (fetchErr: any) {
+                // Xato bo'lsa ID ni surmaymiz (Safe Pointer)
+                this.logger.warn('telegram', `Oraliqdagi xabarlarni yuklashda xatolik (${d.title || target}): ${fetchErr?.message || fetchErr}`);
               }
             }
           }
@@ -363,14 +397,18 @@ export class UserbotService implements OnModuleInit {
 
             this.markMessageAsSeen(uniqueId);
 
+            const postLink = username
+              ? `https://t.me/${username}/${m.id}`
+              : `https://t.me/c/${trueChannelId}/${m.id}`;
+
             this.logger.info(
               'telegram',
               `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
-              { preview: mText.slice(0, 120), chatId: target, msgId: m.id },
+              { preview: mText.slice(0, 120), chatId: target, msgId: m.id, link: postLink },
             );
 
             // Mustaqil asinxron bajarish: bitta kanalning AI/forward jarayoni boshqa kanallarni to'xtatmaydi!
-            this.sendFinal(target, [m], mText, uniqueId, channelName).catch((err: any) => {
+            this.sendFinal(target, [m], mText, uniqueId, channelName, postLink, m.id).catch((err: any) => {
               this.logger.error('telegram', `Xabarni qayta ishlashda xatolik (${uniqueId}): ${err?.message || err}`);
             });
           }
@@ -605,7 +643,10 @@ export class UserbotService implements OnModuleInit {
 
     const uniqueId = `${effectiveChatId}_msg_${msg.id}`;
     if (this.processedMessageIds.has(uniqueId)) return;
-    await this.sendFinal(effectiveChatId, [msg], text, uniqueId, chatTitle);
+    const postLink = username
+      ? `https://t.me/${username}/${msg.id}`
+      : `https://t.me/c/${effectiveChatId.replace(/^-100/, '')}/${msg.id}`;
+    await this.sendFinal(effectiveChatId, [msg], text, uniqueId, chatTitle, postLink, msg.id);
   }
 
   private async processAlbumLogic(chatId: string, groupedId: string, channelName?: string) {
@@ -627,7 +668,8 @@ export class UserbotService implements OnModuleInit {
       if (this.processedMessageIds.has(uniqueId)) return;
       if (longestText.trim()) {
         const validMsgs = msgs.filter((m: any) => m !== null && m !== undefined);
-        await this.sendFinal(chatId, validMsgs, longestText, uniqueId, channelName || chatId);
+        const postLink = `https://t.me/c/${chatId.replace(/^-100/, '')}/${data.ids[0]}`;
+        await this.sendFinal(chatId, validMsgs, longestText, uniqueId, channelName || chatId, postLink, data.ids[0]);
       }
     } catch (err: any) {
       this.logger.error('telegram', `Albomni qayta ishlashda xatolik: ${err?.message || err}`);
@@ -644,7 +686,20 @@ export class UserbotService implements OnModuleInit {
     }
   }
 
-  private async sendFinal(sourceChat: string, messages: any[], text: string, uniqueId: string, channelName: string) {
+  private async sendFinal(
+    sourceChat: string,
+    messages: any[],
+    text: string,
+    uniqueId: string,
+    channelName: string,
+    postLink?: string,
+    rawMsgId?: number,
+  ) {
+    if (this.isPaused) {
+      this.logger.info('system', `Pauza yoqilgan, xabar qayta ishlanmadi: ${uniqueId}`);
+      return;
+    }
+
     if (this.processedMessageIds.has(uniqueId)) return;
     this.markMessageAsSeen(uniqueId);
 
@@ -675,15 +730,40 @@ export class UserbotService implements OnModuleInit {
 
     this.logger.success('telegram', `Kalit so'z topildi: "${foundKw}" | Kanal: "${channelName}"`);
 
-    await this.db.markAsSent(uniqueId, text.slice(0, 500), 'PENDING', channelName, 'PROCESSING');
+    await this.db.markAsSent(uniqueId, text.slice(0, 1000), 'PENDING', channelName, 'PROCESSING', undefined, postLink, sourceChat, rawMsgId);
 
     this.logger.info('groq', `AI tahlili boshlandi... Xabar: "${text.slice(0, 80)}..."`);
-    const analyzeResult = await this.analyzeContentSmart(text.slice(0, 2000));
+    
+    // AI Tahlil (Avtomatik 2 marta urinish)
+    let analyzeResult = 'ERROR';
+    let aiError = '';
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        analyzeResult = await this.analyzeContentSmart(text.slice(0, 2000));
+        if (analyzeResult && analyzeResult !== 'ERROR') break;
+      } catch (err: any) {
+        aiError = err?.message || String(err);
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+
     this.logger.info('groq', `AI tahlil natijasi: ${analyzeResult}`);
 
-    if (analyzeResult === 'SKIP' || analyzeResult === 'ERROR') {
-      await this.db.markAsSent(uniqueId, text.slice(0, 500), analyzeResult, channelName, 'SKIPPED');
-      this.logger.warn('groq', `Xabar o'tkazib yuborildi (Natija: ${analyzeResult}). Guruhga yuborilmaydi.`);
+    if (analyzeResult === 'ERROR') {
+      await this.db.markAsSent(uniqueId, text.slice(0, 1000), 'ERROR', channelName, 'AI_FAILED', aiError || 'Groq AI javob bermadi', postLink, sourceChat, rawMsgId);
+      this.logger.error('groq', `AI tahlilida xatolik yuz berdi. Xabar bazada AI_FAILED sifatida saqlab qolindi (yo'qolmadi!).`);
+      return;
+    }
+
+    if (analyzeResult === 'SKIP') {
+      await this.db.markAsSent(uniqueId, text.slice(0, 1000), analyzeResult, channelName, 'SKIPPED', undefined, postLink, sourceChat, rawMsgId);
+      this.logger.warn('groq', `Xabar o'tkazib yuborildi (Natija: SKIP). Guruhga yuborilmaydi.`);
+      return;
+    }
+
+    if (this.isSimulationMode) {
+      await this.db.markAsSent(uniqueId, text.slice(0, 1000), analyzeResult, channelName, 'SIMULATION', 'Test rejimida guruhga yuborilmadi', postLink, sourceChat, rawMsgId);
+      this.logger.info('system', `🧪 [TEST REJIMI] Xabar tahlil qilindi (${analyzeResult}), guruhga yuborilmadi.`);
       return;
     }
 
@@ -701,7 +781,7 @@ export class UserbotService implements OnModuleInit {
 
     if (!targetGroups || targetGroups.length === 0) {
       this.logger.warn('forward', `"${analyzeResult}" toifasi uchun birorta ham guruh topilmadi.`);
-      await this.db.markAsSent(uniqueId, text.slice(0, 500), analyzeResult, channelName, 'NO_GROUP');
+      await this.db.markAsSent(uniqueId, text.slice(0, 1000), analyzeResult, channelName, 'NO_GROUP', 'Ushbu toifa uchun guruh kiritilmagan', postLink, sourceChat, rawMsgId);
       return;
     }
 
@@ -709,10 +789,10 @@ export class UserbotService implements OnModuleInit {
     this.logger.info('forward', `${targetGroups.length} ta guruhga yuborilmoqda... (Toifa: ${analyzeResult})`);
 
     let sentCount = 0;
+    let forwardError = '';
     for (const target of targetGroups) {
       const destId = target.group_id.trim();
       try {
-        // Resolve destination entity from cache or MTProto
         const cachedGroup = this.channelCache.get(destId) ||
           this.channelCache.get(`-100${destId.replace(/^-100/, '')}`) ||
           this.channelCache.get(destId.replace(/^-100/, ''));
@@ -732,9 +812,7 @@ export class UserbotService implements OnModuleInit {
         if (info) {
           try {
             await this.client.sendMessage(destination, { message: info });
-          } catch (e: any) {
-            this.logger.warn('forward', `Info xabarini yuborishda xatolik: ${e?.message || e}`);
-          }
+          } catch { }
         }
 
         try {
@@ -752,8 +830,8 @@ export class UserbotService implements OnModuleInit {
           const rawId = sourceChat.toString();
           const cleanId = rawId.startsWith('-100') ? rawId.slice(4) : rawId.replace(/^-/, '');
           const msgId = msgIds[0];
-          const postLink = `https://t.me/c/${cleanId}/${msgId}`;
-          const newText = `${text}\n\n🔗 Manba: ${postLink}`;
+          const calculatedLink = postLink || `https://t.me/c/${cleanId}/${msgId}`;
+          const newText = `${text}\n\n🔗 Manba: ${calculatedLink}`;
           await this.client.sendMessage(destination, {
             message: newText,
             linkPreview: false,
@@ -762,16 +840,17 @@ export class UserbotService implements OnModuleInit {
           this.logger.success('forward', `Xabar matn shaklida guruhga yuborildi: ${destId}`);
         }
       } catch (err: any) {
-        this.logger.error('forward', `Guruhga (${destId}) yuborishda xatolik: ${err?.message || err}`);
+        forwardError = err?.message || String(err);
+        this.logger.error('forward', `Guruhga (${destId}) yuborishda xatolik: ${forwardError}`);
       }
     }
 
-    const finalStatus = sentCount > 0 ? 'SENT' : 'FAILED';
-    await this.db.markAsSent(uniqueId, text.slice(0, 500), analyzeResult, channelName, finalStatus);
+    const finalStatus = sentCount > 0 ? 'SENT' : 'FORWARD_FAILED';
+    await this.db.markAsSent(uniqueId, text.slice(0, 1000), analyzeResult, channelName, finalStatus, forwardError || undefined, postLink, sourceChat, rawMsgId);
     if (finalStatus === 'SENT') {
       this.logger.success('system', `Xabar to'liq qayta ishlandi va tarixga yozildi (${analyzeResult} -> SENT)`);
     } else {
-      this.logger.error('system', `Xabarni guruhlarga yuborib bo'lmadi (${analyzeResult} -> FAILED)`);
+      this.logger.error('system', `Xabarni guruhlarga yuborib bo'lmadi (${analyzeResult} -> FORWARD_FAILED). Bazada saqlandi!`);
     }
   }
 
@@ -1191,6 +1270,108 @@ Javob faqat bitta so'z bo'lsin.`;
       results,
       sync: newSync,
     };
+  }
+
+  async resendHistoryItem(uniqueId: string, overrideType?: string): Promise<{ success: boolean; message: string }> {
+    if (!this.client || !this.isConnected) {
+      return { success: false, message: 'Telegram userbot ulanmagan' };
+    }
+
+    const item = await this.db.getHistoryItem(uniqueId);
+    if (!item) {
+      return { success: false, message: 'Xabar topilmadi' };
+    }
+
+    const type = overrideType || (item.sentiment === 'YAXSHI' ? 'good' : item.sentiment === 'YOMON' ? 'bad' : 'neutral');
+    const targetGroups = await this.db.getGroups(type);
+    if (!targetGroups || targetGroups.length === 0) {
+      return { success: false, message: `"${type.toUpperCase()}" toifasi uchun birorta ham guruh topilmadi` };
+    }
+
+    let sent = 0;
+    const text = item.text || '';
+    const linkStr = item.post_link ? `\n\n🔗 Manba: ${item.post_link}` : '';
+    const fullMsg = `${text}${linkStr}`;
+
+    for (const g of targetGroups) {
+      const destId = g.group_id.trim();
+      try {
+        let destination: any = destId;
+        try {
+          destination = await this.client.getInputEntity(destId);
+        } catch {
+          destination = destId;
+        }
+
+        if (item.raw_chat_id && item.raw_msg_id) {
+          try {
+            await this.client.forwardMessages(destination, {
+              messages: [item.raw_msg_id],
+              fromPeer: item.raw_chat_id,
+            });
+            sent++;
+            continue;
+          } catch { }
+        }
+
+        await this.client.sendMessage(destination, { message: fullMsg, linkPreview: false });
+        sent++;
+      } catch (err: any) {
+        this.logger.error('forward', `Qayta yuborishda xatolik (${destId}): ${err?.message || err}`);
+      }
+    }
+
+    if (sent > 0) {
+      await this.db.markAsSent(uniqueId, item.text, item.sentiment, item.channel, 'SENT', undefined, item.post_link, item.raw_chat_id, item.raw_msg_id);
+      this.logger.success('system', `Xabar muvaffaqiyatli qayta yuborildi: ${uniqueId}`);
+      return { success: true, message: `${sent} ta guruhga muvaffaqiyatli yuborildi` };
+    } else {
+      await this.db.markAsSent(uniqueId, item.text, item.sentiment, item.channel, 'FORWARD_FAILED', 'Guruhlarga qayta yuborish muvaffaqiyatsiz bo\'ldi', item.post_link, item.raw_chat_id, item.raw_msg_id);
+      return { success: false, message: 'Guruhlarga yuborishda xatolik yuz berdi' };
+    }
+  }
+
+  async testAiContent(text: string): Promise<any> {
+    const clean = this.normalizeText(text);
+    const keywords = this.cachedKeywords.length > 0 ? this.cachedKeywords : await this.db.getKeywords();
+    let foundKw = null;
+    for (const k of keywords) {
+      if (!k.trim()) continue;
+      if (clean.includes(this.normalizeText(k))) {
+        foundKw = k;
+        break;
+      }
+    }
+
+    const sentiment = await this.analyzeContentSmart(text.slice(0, 2000));
+    return {
+      hasKeyword: Boolean(foundKw),
+      matchedKeyword: foundKw,
+      sentiment,
+      textPreview: text.slice(0, 200),
+      testedAt: new Date().toISOString(),
+    };
+  }
+
+  async getSystemMode(): Promise<any> {
+    return {
+      isPaused: this.isPaused,
+      isSimulationMode: this.isSimulationMode,
+    };
+  }
+
+  async setSystemMode(mode: { isPaused?: boolean; isSimulationMode?: boolean }): Promise<any> {
+    if (mode.isPaused !== undefined) {
+      this.isPaused = Boolean(mode.isPaused);
+      await this.db.setSetting('system_paused', String(this.isPaused));
+      this.logger.info('system', `Tizim holati: ${this.isPaused ? '⏸️ PAUZA (To\'xtatilgan)' : '▶️ FAOL (Ishga tushirildi)'}`);
+    }
+    if (mode.isSimulationMode !== undefined) {
+      this.isSimulationMode = Boolean(mode.isSimulationMode);
+      await this.db.setSetting('system_simulation', String(this.isSimulationMode));
+      this.logger.info('system', `Test rejimi: ${this.isSimulationMode ? '🧪 YOQILGAN (Guruhlarga yuborilmaydi)' : '🔴 O\'CHIRILGAN (Jonli rejim)'}`);
+    }
+    return this.getSystemMode();
   }
 }
 

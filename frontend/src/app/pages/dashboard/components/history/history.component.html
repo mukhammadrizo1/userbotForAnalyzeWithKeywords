@@ -2,7 +2,7 @@
   <div class="view-header">
     <div>
       <h2 class="view-title">Xabarlar Tahlili Tarixi</h2>
-      <p class="view-subtitle">Userbot tomonidan tutilgan va AI tahlil qilgan so'nggi xabarlar jurnali</p>
+      <p class="view-subtitle">Userbot tomonidan tutilgan va AI tahlil qilgan xabarlar jurnali va xatoliklar nazorati</p>
     </div>
     <div class="header-actions">
       <span hlmBadge variant="secondary" class="total-badge">
@@ -30,36 +30,83 @@
     </div>
   </div>
 
-  <div class="search-bar">
-    <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-    </svg>
-    <input
-      hlmInput
-      type="text"
-      [ngModel]="searchQuery()"
-      (ngModelChange)="searchQuery.set($event)"
-      placeholder="ID, kanal yoki xulosa bo'yicha qidirish..."
-      class="pl-10 w-full"
-    />
+  <div class="history-controls">
+    <div class="category-filters">
+      <button
+        type="button"
+        class="filter-pill"
+        [class.active]="filterType() === 'all'"
+        (click)="filterType.set('all')"
+      >
+        Barchasi
+      </button>
+      <button
+        type="button"
+        class="filter-pill good"
+        [class.active]="filterType() === 'good'"
+        (click)="filterType.set('good')"
+      >
+        🟢 Yaxshi
+      </button>
+      <button
+        type="button"
+        class="filter-pill bad"
+        [class.active]="filterType() === 'bad'"
+        (click)="filterType.set('bad')"
+      >
+        🔴 Yomon
+      </button>
+      <button
+        type="button"
+        class="filter-pill neutral"
+        [class.active]="filterType() === 'neutral'"
+        (click)="filterType.set('neutral')"
+      >
+        ⚪ Neytral
+      </button>
+      <button
+        type="button"
+        class="filter-pill failed"
+        [class.active]="filterType() === 'failed'"
+        (click)="filterType.set('failed')"
+      >
+        ⚠️ Xatoliklar / Qayta yuborish
+      </button>
+    </div>
+
+    <div class="search-bar">
+      <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input
+        hlmInput
+        type="text"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Kanal, matn, ID yoki xatolik sababi bo'yicha qidirish..."
+        class="pl-10 w-full"
+      />
+    </div>
   </div>
 
   <div class="table-card">
     <table class="history-table">
       <thead>
         <tr>
-          <th>Xabar ID</th>
           <th>Kanal / Manba</th>
           <th>AI Xulosasi</th>
           <th>Holat</th>
           <th>Sana & Vaqt</th>
+          <th>Manba Linki</th>
           <th class="text-right">Amallar</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let h of filtered()" class="table-row">
-          <td class="id-col" (click)="openDetail(h)">{{ h.msg_unique_id }}</td>
-          <td class="channel-col" (click)="openDetail(h)">{{ h.channel || 'Nomaʼlum' }}</td>
+        <tr *ngFor="let h of filtered()" class="table-row" [class.row-failed]="h.status === 'FORWARD_FAILED' || h.status === 'AI_FAILED'">
+          <td class="channel-col" (click)="openDetail(h)">
+            <span class="font-semibold text-slate-100">{{ h.channel || 'Nomaʼlum' }}</span>
+            <span class="text-xs text-slate-400 block font-mono">{{ h.msg_unique_id }}</span>
+          </td>
           <td (click)="openDetail(h)">
             <span
               hlmBadge
@@ -77,9 +124,47 @@
               {{ h.sentiment || 'SAQLANGAN' }}
             </span>
           </td>
-          <td class="status-col" (click)="openDetail(h)">{{ h.status || 'OK' }}</td>
+          <td class="status-col" (click)="openDetail(h)">
+            <span
+              class="status-tag"
+              [class.tag-sent]="h.status === 'SENT'"
+              [class.tag-failed]="h.status === 'FORWARD_FAILED' || h.status === 'AI_FAILED' || h.status === 'FAILED'"
+              [class.tag-skip]="h.status === 'SKIPPED'"
+              [class.tag-sim]="h.status === 'SIMULATION'"
+              [title]="h.error_message || h.status"
+            >
+              {{ h.status || 'OK' }}
+              <span *ngIf="h.error_message" class="ml-1">⚠️</span>
+            </span>
+          </td>
           <td class="date-col" (click)="openDetail(h)">{{ formatDate(h.date_added) }}</td>
+          <td class="link-col">
+            <a
+              *ngIf="getPostLink(h)"
+              [href]="getPostLink(h)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="post-link-btn"
+              title="Telegram kanalida postni ochish"
+            >
+              <span>Telegramda</span>
+              <svg class="w-3.5 h-3.5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+            <span *ngIf="!getPostLink(h)" class="text-xs text-slate-500">-</span>
+          </td>
           <td class="actions-col text-right">
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              (click)="onResend(h)"
+              title="Guruhga qayta yuborish"
+              class="btn-resend-mini mr-1"
+            >
+              <span>Qayta yuborish</span>
+            </button>
             <button
               hlmBtn
               variant="ghost"
@@ -119,11 +204,16 @@
   <app-dialog
     [isOpen]="detailModalOpen()"
     title="Xabar Tahlili Tafsilotlari"
-    description="Telegram post matni va Groq AI xulosasi"
+    description="Telegram post matni, Groq AI xulosasi va yo'naltirish holati"
     maxWidthClass="max-w-2xl"
     (closed)="detailModalOpen.set(false)"
   >
     <div class="detail-container">
+      <div *ngIf="selectedItem()?.error_message" class="error-alert-box">
+        <div class="error-alert-title">⚠️ Yuz bergan xatolik sababi:</div>
+        <div class="error-alert-text">{{ selectedItem()?.error_message }}</div>
+      </div>
+
       <div class="detail-grid">
         <div class="detail-cell">
           <span class="cell-label">Unikal ID:</span>
@@ -131,7 +221,7 @@
         </div>
         <div class="detail-cell">
           <span class="cell-label">Kanal:</span>
-          <span class="cell-value">{{ selectedItem()?.channel || '-' }}</span>
+          <span class="cell-value font-semibold">{{ selectedItem()?.channel || '-' }}</span>
         </div>
         <div class="detail-cell">
           <span class="cell-label">AI Bahosi:</span>
@@ -151,6 +241,16 @@
           </span>
         </div>
         <div class="detail-cell">
+          <span class="cell-label">Holat:</span>
+          <span class="cell-value font-semibold">{{ selectedItem()?.status }}</span>
+        </div>
+        <div class="detail-cell" *ngIf="getPostLink(selectedItem())">
+          <span class="cell-label">Post Linki:</span>
+          <a [href]="getPostLink(selectedItem())" target="_blank" class="text-sky-400 underline text-xs">
+            Telegramda ko'rish ↗
+          </a>
+        </div>
+        <div class="detail-cell">
           <span class="cell-label">Vaqt:</span>
           <span class="cell-value">{{ formatDate(selectedItem()?.date_added) }}</span>
         </div>
@@ -168,6 +268,21 @@
         </div>
         <div class="post-content">
           {{ selectedItem()?.text || '(Matn mavjud emas)' }}
+        </div>
+      </div>
+
+      <div class="resend-section">
+        <span class="resend-title">Qo'lda yo'naltirish (Qayta yuborish):</span>
+        <div class="resend-buttons">
+          <button hlmBtn variant="outline" size="sm" (click)="onResend(selectedItem(), 'good')" class="text-emerald-400 border-emerald-500/30">
+            🟢 Good guruhga
+          </button>
+          <button hlmBtn variant="outline" size="sm" (click)="onResend(selectedItem(), 'bad')" class="text-rose-400 border-rose-500/30">
+            🔴 Bad guruhga
+          </button>
+          <button hlmBtn variant="outline" size="sm" (click)="onResend(selectedItem(), 'neutral')" class="text-blue-400 border-blue-500/30">
+            ⚪ Neutral guruhga
+          </button>
         </div>
       </div>
     </div>

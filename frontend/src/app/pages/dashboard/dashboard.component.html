@@ -16,7 +16,7 @@
     [botUser]="status()?.botUser"
     [collapsed]="sidebarCollapsed()"
     [mobileOpen]="mobileSidebarOpen()"
-    (sectionChange)="activeSection.set($event)"
+    (sectionChange)="onSectionChange($event)"
     (toggleCollapse)="toggleSidebar()"
     (closeMobile)="closeMobileSidebar()"
     (logoutClick)="logout()"
@@ -42,6 +42,7 @@
               <span *ngSwitchCase="'keywords'">Qidiruv Kalit So'zlari</span>
               <span *ngSwitchCase="'groups'">Guruhlar & Yo'naltirish</span>
               <span *ngSwitchCase="'history'">Tahlil Tarixi</span>
+              <span *ngSwitchCase="'tester'">AI Sinov Maydoni</span>
               <span *ngSwitchCase="'logs'">Jonli Tizim Loglari</span>
               <span *ngSwitchCase="'system'">Tizim & AI Holati</span>
               <span *ngSwitchDefault>Boshqaruv Paneli</span>
@@ -53,6 +54,7 @@
               <span *ngSwitchCase="'keywords'">Postlarda AI tahlilini faollashtiruvchi kalit iboralar</span>
               <span *ngSwitchCase="'groups'">Tahlil natijalariga ko'ra xabarlar yo'naltiriladigan guruhlar</span>
               <span *ngSwitchCase="'history'">Groq AI tahlilidan o'tgan so'nggi 50 ta xabarlar arxivi</span>
+              <span *ngSwitchCase="'tester'">Xabarlarni Groq AI va kalit so'zlar bo'yicha mustaqil sinovdan o'tkazish</span>
               <span *ngSwitchCase="'logs'">Userbot va AI xizmatlarining real-vaqtdagi jarayonlarini kuzatish</span>
               <span *ngSwitchCase="'system'">Telegram MTProto va Groq Llama 3 tizim holati parametrlari</span>
               <span *ngSwitchDefault>UTY Monitoring va AI filtr boshqaruvi</span>
@@ -62,6 +64,27 @@
       </div>
 
       <div class="topbar-actions">
+        <!-- Pause / Resume Pill -->
+        <button
+          *ngIf="systemMode().isPaused"
+          (click)="togglePause()"
+          class="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition-all cursor-pointer"
+          title="Tizim to'xtatilgan. Davom ettirish uchun bosing"
+        >
+          <span class="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+          <span>To'xtatilgan (Davom ettirish)</span>
+        </button>
+
+        <!-- Simulation Pill -->
+        <button
+          *ngIf="systemMode().isSimulationMode"
+          (click)="toggleSimulation()"
+          class="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer"
+          title="Simulyatsiya rejimi: guruhlarga yuborilmaydi"
+        >
+          <span>🧪 Simulyatsiya</span>
+        </button>
+
         <span hlmBadge [variant]="status()?.connected ? 'success' : 'warning'" class="gap-1.5 py-1 px-3">
           <span class="status-dot"></span>
           <span>{{ status()?.connected ? 'Telegram Faol' : 'Bot Kutishda' }}</span>
@@ -88,6 +111,7 @@
         *ngIf="activeSection() === 'channels'"
         [channels]="channels()"
         (addChannel)="handleAddChannel($event)"
+        (addBatchChannels)="handleAddBatchChannels($event)"
         (updateChannel)="handleUpdateChannel($event)"
         (deleteChannel)="handleDeleteChannel($event)"
       ></app-channels>
@@ -96,6 +120,7 @@
         *ngIf="activeSection() === 'keywords'"
         [keywords]="keywords()"
         (addKeyword)="handleAddKeyword($event)"
+        (addBatchKeywords)="handleAddBatchKeywords($event)"
         (updateKeyword)="handleUpdateKeyword($event)"
         (deleteKeyword)="handleDeleteKeyword($event)"
       ></app-keywords>
@@ -112,9 +137,14 @@
         *ngIf="activeSection() === 'history'"
         [history]="history()"
         (refresh)="loadHistory()"
+        (resendItem)="handleResendHistory($event)"
         (deleteItem)="handleDeleteHistoryItem($event)"
         (clearAll)="handleClearHistory()"
       ></app-history>
+
+      <app-tester
+        *ngIf="activeSection() === 'tester'"
+      ></app-tester>
 
       <app-system-status
         *ngIf="activeSection() === 'system'"

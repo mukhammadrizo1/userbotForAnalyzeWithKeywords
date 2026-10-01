@@ -9,6 +9,11 @@ import { ConfirmModalComponent } from '../../../../components/ui/confirm-modal/c
 
 export interface ChannelItem {
   ident: string;
+  channelId?: string;
+  username?: string;
+  title?: string;
+  lastMsgId?: number;
+  lastCheckedAt?: string;
   isJoined?: boolean;
 }
 
@@ -33,11 +38,20 @@ export class ChannelsComponent {
       if (typeof item === 'string') {
         return { ident: item, isJoined: undefined };
       }
-      return { ident: item.ident || item.name || '', isJoined: item.isJoined };
+      return {
+        ident: item.ident || item.name || '',
+        channelId: item.channelId || item.channel_id,
+        username: item.username,
+        title: item.title,
+        lastMsgId: item.lastMsgId || item.last_msg_id,
+        lastCheckedAt: item.lastCheckedAt || item.last_checked_at,
+        isJoined: item.isJoined,
+      };
     });
     this._channels.set(list);
   }
   @Output() addChannel = new EventEmitter<string>();
+  @Output() addBatchChannels = new EventEmitter<string[]>();
   @Output() updateChannel = new EventEmitter<any>();
   @Output() deleteChannel = new EventEmitter<string>();
 
@@ -45,11 +59,14 @@ export class ChannelsComponent {
   searchQuery = signal<string>('');
 
   addModalOpen = signal<boolean>(false);
+  isBatchMode = signal<boolean>(false);
   editModalOpen = signal<boolean>(false);
   detailModalOpen = signal<boolean>(false);
   confirmModalOpen = signal<boolean>(false);
 
   newChannelInput = signal<string>('');
+  batchChannelInput = signal<string>('');
+  selectedChannelItem = signal<ChannelItem | null>(null);
   selectedChannel = signal<string>('');
   editChannelInput = signal<string>('');
 
@@ -57,18 +74,37 @@ export class ChannelsComponent {
     const q = this.searchQuery().toLowerCase().trim();
     const list = this._channels();
     if (!q) return list;
-    return list.filter((c) => (c.ident || '').toLowerCase().includes(q));
+    return list.filter(
+      (c) =>
+        (c.ident || '').toLowerCase().includes(q) ||
+        (c.title || '').toLowerCase().includes(q) ||
+        (c.username || '').toLowerCase().includes(q),
+    );
   });
 
   openAddModal(): void {
     this.newChannelInput.set('');
+    this.batchChannelInput.set('');
+    this.isBatchMode.set(false);
     this.addModalOpen.set(true);
   }
 
   submitAdd(): void {
-    const val = this.newChannelInput().trim();
-    if (!val) return;
-    this.addChannel.emit(val);
+    if (this.isBatchMode()) {
+      const raw = this.batchChannelInput().trim();
+      if (!raw) return;
+      const list = raw
+        .split(/[\n,]+/)
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0);
+      if (list.length > 0) {
+        this.addBatchChannels.emit(list);
+      }
+    } else {
+      const val = this.newChannelInput().trim();
+      if (!val) return;
+      this.addChannel.emit(val);
+    }
     this.addModalOpen.set(false);
   }
 

@@ -12,6 +12,7 @@ import { GroupsComponent } from './components/groups/groups.component';
 import { HistoryComponent } from './components/history/history.component';
 import { SystemStatusComponent } from './components/system-status/system-status.component';
 import { LogsComponent } from './components/logs/logs.component';
+import { TesterComponent } from './components/tester/tester.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -28,6 +29,7 @@ import { LogsComponent } from './components/logs/logs.component';
     HistoryComponent,
     SystemStatusComponent,
     LogsComponent,
+    TesterComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
@@ -44,6 +46,7 @@ export class DashboardComponent implements OnInit {
   keywords = signal<string[]>([]);
   groups = signal<any[]>([]);
   history = signal<any[]>([]);
+  systemMode = signal<{ isPaused: boolean; isSimulationMode: boolean }>({ isPaused: false, isSimulationMode: false });
 
   constructor(
     private api: ApiService,
@@ -51,7 +54,9 @@ export class DashboardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.refreshAll();
+    this.loadStatus();
+    this.loadSystemMode();
+    this.loadSectionData(this.activeSection());
   }
 
   toggleSidebar(): void {
@@ -66,14 +71,83 @@ export class DashboardComponent implements OnInit {
     this.mobileSidebarOpen.set(false);
   }
 
+  onSectionChange(sec: string): void {
+    this.activeSection.set(sec);
+    this.loadSectionData(sec);
+  }
+
+  loadSectionData(sec: string): void {
+    switch (sec) {
+      case 'channels':
+        if (this.channels().length === 0) this.loadChannels();
+        break;
+      case 'keywords':
+        if (this.keywords().length === 0) this.loadKeywords();
+        break;
+      case 'groups':
+        if (this.groups().length === 0) this.loadGroups();
+        break;
+      case 'history':
+        this.loadHistory();
+        break;
+      case 'system':
+        this.loadStatus();
+        this.loadSystemMode();
+        break;
+    }
+  }
+
   refreshAll(): void {
     this.loading.set(true);
     this.loadStatus();
-    this.loadChannels();
-    this.loadKeywords();
-    this.loadGroups();
-    this.loadHistory();
+    this.loadSystemMode();
+    const current = this.activeSection();
+    if (current === 'channels') this.loadChannels();
+    else if (current === 'keywords') this.loadKeywords();
+    else if (current === 'groups') this.loadGroups();
+    else if (current === 'history') this.loadHistory();
+    else {
+      this.loadChannels();
+      this.loadKeywords();
+      this.loadGroups();
+    }
     setTimeout(() => this.loading.set(false), 400);
+  }
+
+  loadSystemMode(): void {
+    this.api.getSystemMode().subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.systemMode.set({
+            isPaused: !!res.isPaused,
+            isSimulationMode: !!res.isSimulationMode,
+          });
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  togglePause(): void {
+    const nextState = !this.systemMode().isPaused;
+    this.api.setSystemMode({ isPaused: nextState }).subscribe({
+      next: () => {
+        this.systemMode.update((s) => ({ ...s, isPaused: nextState }));
+        this.showToast(nextState ? 'Tizim vaqtincha toʻxtatildi' : 'Tizim monitoringni davom ettirmoqda', 'success');
+      },
+      error: () => this.showToast('Rejimni oʻzgartirishda xatolik', 'error'),
+    });
+  }
+
+  toggleSimulation(): void {
+    const nextState = !this.systemMode().isSimulationMode;
+    this.api.setSystemMode({ isSimulationMode: nextState }).subscribe({
+      next: () => {
+        this.systemMode.update((s) => ({ ...s, isSimulationMode: nextState }));
+        this.showToast(nextState ? 'Simulyatsiya rejimi yoqildi (guruhlarga yuborilmaydi)' : 'Real rejimga oʻtildi', 'success');
+      },
+      error: () => this.showToast('Rejimni oʻzgartirishda xatolik', 'error'),
+    });
   }
 
   loadStatus(): void {
@@ -250,6 +324,42 @@ export class DashboardComponent implements OnInit {
         }
       },
       error: () => this.showToast('Xabarni oʻchirishda xatolik', 'error'),
+    });
+  }
+
+  handleAddBatchChannels(idents: string[]): void {
+    this.api.addChannelsBatch(idents).subscribe({
+      next: (res: any) => {
+        this.showToast(`${res.added || 0} ta yangi kanal qo'shildi (${res.skipped || 0} ta mavjud)`, 'success');
+        this.loadChannels();
+        this.loadStatus();
+      },
+      error: () => this.showToast('Kanallarni ommaviy qoʻshishda xatolik', 'error'),
+    });
+  }
+
+  handleAddBatchKeywords(words: string[]): void {
+    this.api.addKeywordsBatch(words).subscribe({
+      next: (res: any) => {
+        this.showToast(`${res.added || 0} ta yangi kalit soʻz qo'shildi (${res.skipped || 0} ta mavjud)`, 'success');
+        this.loadKeywords();
+        this.loadStatus();
+      },
+      error: () => this.showToast('Kalit soʻzlarni ommaviy qoʻshishda xatolik', 'error'),
+    });
+  }
+
+  handleResendHistory(event: { id: string; overrideType?: string }): void {
+    this.api.resendHistory(event.id, event.overrideType).subscribe({
+      next: (res: any) => {
+        if (res.success) {
+          this.showToast('Xabar guruhga muvaffaqiyatli qayta yuborildi!', 'success');
+          this.loadHistory();
+        } else {
+          this.showToast(`Yuborishda xatolik: ${res.error || 'Nomaʼlum xato'}`, 'error');
+        }
+      },
+      error: (err: any) => this.showToast(`Qayta yuborishda xatolik: ${err?.error?.error || err.message}`, 'error'),
     });
   }
 

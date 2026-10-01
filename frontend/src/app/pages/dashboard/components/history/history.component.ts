@@ -29,9 +29,11 @@ export class HistoryComponent {
   @Output() refresh = new EventEmitter<void>();
   @Output() deleteItem = new EventEmitter<string>();
   @Output() clearAll = new EventEmitter<void>();
+  @Output() resendItem = new EventEmitter<{ id: string; overrideType?: string }>();
 
   _history = signal<any[]>([]);
   searchQuery = signal<string>('');
+  filterType = signal<string>('all');
 
   detailModalOpen = signal<boolean>(false);
   confirmModalOpen = signal<boolean>(false);
@@ -42,16 +44,44 @@ export class HistoryComponent {
 
   readonly filtered = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
-    const list = this._history();
+    const f = this.filterType();
+    let list = this._history();
+
+    if (f !== 'all') {
+      list = list.filter((h) => {
+        if (f === 'failed') {
+          return h.status === 'FORWARD_FAILED' || h.status === 'AI_FAILED' || h.status === 'FAILED';
+        }
+        return (h.sentiment || '').toLowerCase() === f.toLowerCase();
+      });
+    }
+
     if (!q) return list;
     return list.filter((h) => {
       const idMatch = (h.msg_unique_id || '').toLowerCase().includes(q);
       const chMatch = (h.channel || '').toLowerCase().includes(q);
       const senMatch = (h.sentiment || '').toLowerCase().includes(q);
       const textMatch = (h.text || '').toLowerCase().includes(q);
-      return idMatch || chMatch || senMatch || textMatch;
+      const errMatch = (h.error_message || '').toLowerCase().includes(q);
+      return idMatch || chMatch || senMatch || textMatch || errMatch;
     });
   });
+
+  onResend(item: any, overrideType?: string): void {
+    if (!item || !item.msg_unique_id) return;
+    this.resendItem.emit({ id: item.msg_unique_id, overrideType });
+    this.detailModalOpen.set(false);
+  }
+
+  getPostLink(item: any): string {
+    if (!item) return '';
+    if (item.post_link) return item.post_link;
+    if (item.channel && item.raw_msg_id && !item.channel.startsWith('-100')) {
+      const clean = item.channel.replace('@', '').replace('https://t.me/', '');
+      return `https://t.me/${clean}/${item.raw_msg_id}`;
+    }
+    return '';
+  }
 
   formatDate(dateStr: string): string {
     if (!dateStr) return '-';

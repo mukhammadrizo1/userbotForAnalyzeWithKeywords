@@ -27,7 +27,7 @@
         type="text"
         [ngModel]="searchQuery()"
         (ngModelChange)="searchQuery.set($event)"
-        placeholder="Kanal qidirish..."
+        placeholder="Kanal nomi, username yoki ID bo'yicha qidirish..."
         class="pl-10 w-full"
       />
     </div>
@@ -39,22 +39,46 @@
         <div class="channel-icon">📢</div>
         <div class="channel-info">
           <div class="channel-header-row">
-            <span class="channel-name" [title]="ch.ident">{{ ch.ident }}</span>
+            <span class="channel-name" [title]="ch.title || ch.ident">
+              {{ ch.title || ch.ident }}
+            </span>
             <span
               *ngIf="ch.isJoined !== undefined"
               class="membership-badge"
               [class.joined]="ch.isJoined"
               [class.not-joined]="!ch.isJoined"
-              [title]="ch.isJoined ? 'Userbot ushbu kanalga a\'zo' : 'Userbot bu kanalga hali a\'zo bo\'lmagan'"
+              [title]="ch.isJoined ? 'Userbot monitoring ostida' : 'Kuzatuvda emas'"
             >
               <span class="status-dot-mini"></span>
-              {{ ch.isJoined ? "A'zo bo'lingan" : "A'zo bo'linmagan" }}
+              {{ ch.isJoined ? "Faol" : "Kutilmoqda" }}
             </span>
           </div>
-          <span class="channel-sub">Monitoring faol</span>
+
+          <div class="channel-sub-row">
+            <span class="channel-handle font-mono" *ngIf="ch.username">@{{ ch.username }}</span>
+            <span class="channel-handle font-mono" *ngIf="!ch.username">{{ ch.channelId || ch.ident }}</span>
+            <span *ngIf="ch.lastMsgId" class="channel-progress-tag">
+              Oxirgi: #{{ ch.lastMsgId }}
+            </span>
+          </div>
         </div>
       </div>
+
       <div class="channel-actions">
+        <a
+          *ngIf="getTelegramLink(ch.username || ch.ident)"
+          [href]="getTelegramLink(ch.username || ch.ident)"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-action link-tg"
+          title="Telegramda ochish"
+          (click)="$event.stopPropagation()"
+        >
+          <svg class="w-4 h-4 text-sky-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        </a>
+
         <button
           hlmBtn
           variant="ghost"
@@ -89,30 +113,67 @@
 
   <app-dialog
     [isOpen]="addModalOpen()"
-    title="Yangi Kanal Qoʻshish"
+    title="Kanal Qoʻshish"
     description="Userbot tinglashi uchun ommaviy kanal username yoki guruh ID sini kiriting"
     (closed)="addModalOpen.set(false)"
   >
     <div class="modal-form">
-      <label class="modal-label">Kanal manzili yoki ID</label>
-      <input
-        hlmInput
-        type="text"
-        [ngModel]="newChannelInput()"
-        (ngModelChange)="newChannelInput.set($event)"
-        placeholder="@uzrailways yoki -1001234567890"
-        (keyup.enter)="submitAdd()"
-        class="w-full"
-      />
-      <span class="modal-hint">Misol: @temiryol, @uzrailways_live yoki https://t.me/kanal_nomi</span>
+      <div class="mode-tabs">
+        <button
+          type="button"
+          class="mode-tab"
+          [class.active]="!isBatchMode()"
+          (click)="isBatchMode.set(false)"
+        >
+          Bitta kanal
+        </button>
+        <button
+          type="button"
+          class="mode-tab"
+          [class.active]="isBatchMode()"
+          (click)="isBatchMode.set(true)"
+        >
+          📋 Ommaviy qo'shish (Batch)
+        </button>
+      </div>
+
+      <div *ngIf="!isBatchMode()">
+        <label class="modal-label">Kanal manzili yoki ID</label>
+        <input
+          hlmInput
+          type="text"
+          [ngModel]="newChannelInput()"
+          (ngModelChange)="newChannelInput.set($event)"
+          placeholder="@kunuzofficial yoki -1001234567890"
+          (keyup.enter)="submitAdd()"
+          class="w-full"
+        />
+        <span class="modal-hint">Misol: @temiryol, @uzrailways_live yoki https://t.me/kanal_nomi</span>
+      </div>
+
+      <div *ngIf="isBatchMode()">
+        <label class="modal-label">Kanallar ro'yxati (yangi qatordan yoki vergul bilan):</label>
+        <textarea
+          class="batch-textarea"
+          rows="5"
+          [ngModel]="batchChannelInput()"
+          (ngModelChange)="batchChannelInput.set($event)"
+          placeholder="@kunuzofficial&#10;@daryo_live&#10;@uzrailways&#10;-1001499140614"
+        ></textarea>
+        <span class="modal-hint">Bir vaqtning o'zida o'nlab kanallarni bittada qo'shishingiz mumkin</span>
+      </div>
     </div>
 
     <div dialog-footer class="modal-actions">
       <button hlmBtn variant="outline" (click)="addModalOpen.set(false)">
         <span>Bekor qilish</span>
       </button>
-      <button hlmBtn (click)="submitAdd()" [disabled]="!newChannelInput().trim()">
-        <span>Qoʻshish</span>
+      <button
+        hlmBtn
+        (click)="submitAdd()"
+        [disabled]="isBatchMode() ? !batchChannelInput().trim() : !newChannelInput().trim()"
+      >
+        <span>{{ isBatchMode() ? 'Barchasini qoʻshish' : 'Qoʻshish' }}</span>
       </button>
     </div>
   </app-dialog>
@@ -153,16 +214,36 @@
   >
     <div class="detail-rows">
       <div class="detail-row">
-        <span class="detail-key">Identifikator:</span>
+        <span class="detail-key">Kanal Nomi:</span>
+        <span class="detail-val font-semibold">{{ selectedChannelItem()?.title || selectedChannel() }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChannelItem()?.username">
+        <span class="detail-key">Username:</span>
+        <span class="detail-val font-mono">@{{ selectedChannelItem()?.username }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChannelItem()?.channelId">
+        <span class="detail-key">Telegram Raqamli ID:</span>
+        <span class="detail-val font-mono">{{ selectedChannelItem()?.channelId }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Bazada saqlangan:</span>
         <span class="detail-val font-mono">{{ selectedChannel() }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChannelItem()?.lastMsgId">
+        <span class="detail-key">Oxirgi tekshirilgan xabar ID:</span>
+        <span class="detail-val font-mono">#{{ selectedChannelItem()?.lastMsgId }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChannelItem()?.lastCheckedAt">
+        <span class="detail-key">Oxirgi faollik vaqti:</span>
+        <span class="detail-val">{{ selectedChannelItem()?.lastCheckedAt | date:'HH:mm:ss, dd.MM.yyyy' }}</span>
       </div>
       <div class="detail-row">
         <span class="detail-key">Holat:</span>
         <span hlmBadge variant="success">Monitoring Faol</span>
       </div>
-      <div *ngIf="getTelegramLink(selectedChannel())" class="detail-row">
+      <div *ngIf="getTelegramLink(selectedChannelItem()?.username || selectedChannel())" class="detail-row">
         <span class="detail-key">Telegram Havola:</span>
-        <a [href]="getTelegramLink(selectedChannel())" target="_blank" rel="noopener noreferrer" class="detail-link">
+        <a [href]="getTelegramLink(selectedChannelItem()?.username || selectedChannel())" target="_blank" rel="noopener noreferrer" class="detail-link">
           <span>Telegramda ochish</span>
           <svg class="w-3.5 h-3.5 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>

@@ -41,12 +41,20 @@ export class ApiService {
     return this.http.delete<any>(`${this.base}/channels/${encodeURIComponent(ident)}`);
   }
 
+  addChannelsBatch(idents: string[]): Observable<any> {
+    return this.http.post<any>(`${this.base}/channels/batch`, { idents });
+  }
+
   getKeywords(): Observable<any> {
     return this.http.get<any>(`${this.base}/keywords`);
   }
 
   addKeyword(word: string): Observable<any> {
     return this.http.post<any>(`${this.base}/keywords`, { word });
+  }
+
+  addKeywordsBatch(words: string[]): Observable<any> {
+    return this.http.post<any>(`${this.base}/keywords/batch`, { words });
   }
 
   updateKeyword(oldWord: string, newWord: string): Observable<any> {
@@ -79,8 +87,13 @@ export class ApiService {
     );
   }
 
-  getHistory(limit: number = 50): Observable<any> {
-    return this.http.get<any>(`${this.base}/history?limit=${limit}`);
+  getHistory(limit: number = 50, type?: string): Observable<any> {
+    const query = type && type !== 'all' ? `&type=${encodeURIComponent(type)}` : '';
+    return this.http.get<any>(`${this.base}/history?limit=${limit}${query}`);
+  }
+
+  resendHistory(id: string, overrideType?: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/history/${encodeURIComponent(id)}/resend`, { overrideType });
   }
 
   deleteHistoryItem(id: string): Observable<any> {
@@ -89,6 +102,18 @@ export class ApiService {
 
   clearHistory(): Observable<any> {
     return this.http.delete<any>(`${this.base}/history`);
+  }
+
+  testAi(text: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/tester/analyze`, { text });
+  }
+
+  getSystemMode(): Observable<any> {
+    return this.http.get<any>(`${this.base}/system/mode`);
+  }
+
+  setSystemMode(mode: { isPaused?: boolean; isSimulationMode?: boolean }): Observable<any> {
+    return this.http.post<any>(`${this.base}/system/mode`, mode);
   }
 
   ping(): Observable<any> {

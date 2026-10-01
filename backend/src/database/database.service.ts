@@ -28,6 +28,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       ALTER TABLE channels ADD COLUMN IF NOT EXISTS channel_id TEXT;
       ALTER TABLE channels ADD COLUMN IF NOT EXISTS username TEXT;
       ALTER TABLE channels ADD COLUMN IF NOT EXISTS title TEXT;
+      ALTER TABLE channels ADD COLUMN IF NOT EXISTS last_msg_id BIGINT;
+      ALTER TABLE channels ADD COLUMN IF NOT EXISTS last_checked_at TIMESTAMP;
+
       CREATE TABLE IF NOT EXISTS keywords (
         word TEXT PRIMARY KEY
       );
@@ -44,6 +47,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         channel TEXT,
         status TEXT
       );
+      ALTER TABLE history ADD COLUMN IF NOT EXISTS error_message TEXT;
+      ALTER TABLE history ADD COLUMN IF NOT EXISTS post_link TEXT;
+      ALTER TABLE history ADD COLUMN IF NOT EXISTS raw_chat_id TEXT;
+      ALTER TABLE history ADD COLUMN IF NOT EXISTS raw_msg_id BIGINT;
+
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
@@ -90,8 +98,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getChannelsDetailed(): Promise<any[]> {
-    const res = await this.query('SELECT ident, channel_id, username, title FROM channels ORDER BY ident ASC');
+    const res = await this.query(
+      'SELECT ident, channel_id, username, title, last_msg_id, last_checked_at FROM channels ORDER BY ident ASC',
+    );
     return res.rows;
+  }
+
+  async updateChannelProgress(ident: string, lastMsgId: number): Promise<void> {
+    const clean = this.cleanChannelInput(ident);
+    await this.query(
+      'UPDATE channels SET last_msg_id = $1, last_checked_at = CURRENT_TIMESTAMP WHERE ident = $2',
+      [lastMsgId, clean],
+    );
   }
 
   async updateChannelDetails(ident: string, details: { channelId?: string; username?: string; title?: string }): Promise<void> {
@@ -127,6 +145,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return (res.rowCount ?? 0) > 0;
   }
 
+  async addChannelsBatch(idents: string[]): Promise<{ added: number; total: number }> {
+    let added = 0;
+    for (const item of idents) {
+      const clean = this.cleanChannelInput(item);
+      if (clean) {
+        const ok = await this.addChannel(clean);
+        if (ok) added++;
+      }
+    }
+    return { added, total: idents.length };
+  }
+
   async updateChannel(oldIdent: string, newIdent: string): Promise<boolean> {
     const cleanOld = this.cleanChannelInput(oldIdent);
     const cleanNew = this.cleanChannelInput(newIdent);
@@ -154,6 +184,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       [clean],
     );
     return (res.rowCount ?? 0) > 0;
+  }
+
+  async addKeywordsBatch(words: string[]): Promise<{ added: number; total: number }> {
+    let added = 0;
+    for (const w of words) {
+      const ok = await this.addKeyword(w);
+      if (ok) added++;
+    }
+    return { added, total: words.length };
   }
 
   async updateKeyword(oldWord: string, newWord: string): Promise<boolean> {
@@ -218,18 +257,42 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return res.rowCount > 0;
   }
 
-  async markAsSent(uniqueId: string, text?: string, sentiment?: string, channel?: string, status?: string): Promise<void> {
+  async markAsSent(
+    uniqueId: string,
+    text?: string,
+    sentiment?: string,
+    channel?: string,
+    status?: string,
+    errorMessage?: string,
+    postLink?: string,
+    rawChatId?: string,
+    rawMsgId?: number,
+  ): Promise<void> {
     try {
       await this.query(
-        `INSERT INTO history (msg_unique_id, text, sentiment, channel, status)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO history (msg_unique_id, text, sentiment, channel, status, error_message, post_link, raw_chat_id, raw_msg_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (msg_unique_id) DO UPDATE SET
            text = COALESCE(EXCLUDED.text, history.text),
            sentiment = COALESCE(EXCLUDED.sentiment, history.sentiment),
            channel = COALESCE(EXCLUDED.channel, history.channel),
            status = COALESCE(EXCLUDED.status, history.status),
+           error_message = COALESCE(EXCLUDED.error_message, history.error_message),
+           post_link = COALESCE(EXCLUDED.post_link, history.post_link),
+           raw_chat_id = COALESCE(EXCLUDED.raw_chat_id, history.raw_chat_id),
+           raw_msg_id = COALESCE(EXCLUDED.raw_msg_id, history.raw_msg_id),
            date_added = CURRENT_TIMESTAMP`,
-        [uniqueId, text || null, sentiment || null, channel || null, status || null],
+        [
+          uniqueId,
+          text || null,
+          sentiment || null,
+          channel || null,
+          status || null,
+          errorMessage || null,
+          postLink || null,
+          rawChatId || null,
+          rawMsgId || null,
+        ],
       );
       await this.query(
         'DELETE FROM history WHERE msg_unique_id NOT IN (SELECT msg_unique_id FROM history ORDER BY date_added DESC LIMIT 1000)',
@@ -239,12 +302,29 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async getRecentHistory(limit: number = 50): Promise<any[]> {
-    const res = await this.query(
-      'SELECT msg_unique_id, date_added, text, sentiment, channel, status FROM history ORDER BY date_added DESC LIMIT $1',
-      [limit],
-    );
+  async getRecentHistory(limit: number = 50, filterType?: string): Promise<any[]> {
+    let sql =
+      'SELECT msg_unique_id, date_added, text, sentiment, channel, status, error_message, post_link, raw_chat_id, raw_msg_id FROM history';
+    const params: any[] = [];
+
+    if (filterType && filterType !== 'all') {
+      params.push(filterType.toUpperCase());
+      sql += ' WHERE sentiment = $1 OR status = $1';
+    }
+
+    params.push(limit);
+    sql += ` ORDER BY date_added DESC LIMIT $${params.length}`;
+
+    const res = await this.query(sql, params);
     return res.rows;
+  }
+
+  async getHistoryItem(uniqueId: string): Promise<any | null> {
+    const res = await this.query(
+      'SELECT msg_unique_id, date_added, text, sentiment, channel, status, error_message, post_link, raw_chat_id, raw_msg_id FROM history WHERE msg_unique_id = $1',
+      [uniqueId],
+    );
+    return res.rows.length > 0 ? res.rows[0] : null;
   }
 
   async deleteHistoryItem(uniqueId: string): Promise<boolean> {

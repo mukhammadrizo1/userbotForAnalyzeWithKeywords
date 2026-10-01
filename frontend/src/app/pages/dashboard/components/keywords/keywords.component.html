@@ -57,30 +57,67 @@
 
   <app-dialog
     [isOpen]="addModalOpen()"
-    title="Yangi Kalit Soʻz Qoʻshish"
+    title="Kalit Soʻz Qoʻshish"
     description="Kanallardagi postlarni saralash uchun qidiriladigan kalit soʻz yoki ibora"
     (closed)="addModalOpen.set(false)"
   >
     <div class="modal-form">
-      <label class="modal-label">Kalit soʻz yoki ibora</label>
-      <input
-        hlmInput
-        type="text"
-        [ngModel]="newKeywordInput()"
-        (ngModelChange)="newKeywordInput.set($event)"
-        placeholder="Masalan: afrosiyob, poyezd, chipta, vokzal"
-        (keyup.enter)="submitAdd()"
-        class="w-full"
-      />
-      <span class="modal-hint">Harflar katta-kichikligiga sezgir emas (kichik harflarga o'tkaziladi)</span>
+      <div class="mode-tabs">
+        <button
+          type="button"
+          class="mode-tab"
+          [class.active]="!isBatchMode()"
+          (click)="isBatchMode.set(false)"
+        >
+          Bitta so'z
+        </button>
+        <button
+          type="button"
+          class="mode-tab"
+          [class.active]="isBatchMode()"
+          (click)="isBatchMode.set(true)"
+        >
+          📋 Ommaviy qo'shish (Batch)
+        </button>
+      </div>
+
+      <div *ngIf="!isBatchMode()">
+        <label class="modal-label">Kalit soʻz yoki ibora</label>
+        <input
+          hlmInput
+          type="text"
+          [ngModel]="newKeywordInput()"
+          (ngModelChange)="newKeywordInput.set($event)"
+          placeholder="Masalan: afrosiyob, poyezd, chipta, vokzal"
+          (keyup.enter)="submitAdd()"
+          class="w-full"
+        />
+        <span class="modal-hint">Harflar katta-kichikligiga sezgir emas (kichik harflarga o'tkaziladi)</span>
+      </div>
+
+      <div *ngIf="isBatchMode()">
+        <label class="modal-label">Kalit so'zlar ro'yxati (yangi qatordan yoki vergul bilan):</label>
+        <textarea
+          class="batch-textarea"
+          rows="5"
+          [ngModel]="batchKeywordInput()"
+          (ngModelChange)="batchKeywordInput.set($event)"
+          placeholder="afrosiyob&#10;poyezd&#10;vokzal&#10;temir yo'l&#10;chipta"
+        ></textarea>
+        <span class="modal-hint">Barcha so'zlar avtomatik tozalab bazaga qo'shiladi</span>
+      </div>
     </div>
 
     <div dialog-footer class="modal-actions">
       <button hlmBtn variant="outline" (click)="addModalOpen.set(false)">
         <span>Bekor qilish</span>
       </button>
-      <button hlmBtn (click)="submitAdd()" [disabled]="!newKeywordInput().trim()">
-        <span>Qoʻshish</span>
+      <button
+        hlmBtn
+        (click)="submitAdd()"
+        [disabled]="isBatchMode() ? !batchKeywordInput().trim() : !newKeywordInput().trim()"
+      >
+        <span>{{ isBatchMode() ? 'Barchasini qoʻshish' : 'Qoʻshish' }}</span>
       </button>
     </div>
   </app-dialog>
