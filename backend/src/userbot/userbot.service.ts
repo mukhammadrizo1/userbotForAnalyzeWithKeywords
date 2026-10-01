@@ -293,7 +293,7 @@ export class UserbotService implements OnModuleInit {
       isPolling = true;
 
       try {
-        const dialogs = await this.client.getDialogs({ limit: 120 });
+        const dialogs = await this.client.getDialogs({ limit: 150 });
         for (const d of dialogs) {
           if (!d.isChannel && !d.isGroup) continue;
           const msg = d.message;
@@ -319,37 +319,66 @@ export class UserbotService implements OnModuleInit {
           if (!isMonitored) continue;
 
           const lastId = this.lastPolledMessageId.get(target) || 0;
-          const isRecent = msg.date && (Date.now() / 1000 - msg.date) < 600;
+          const isRecent = msg.date && (Date.now() / 1000 - msg.date) < 1800; // So'nggi 30 daqiqa
+
+          const messagesToProcess: any[] = [];
 
           if (lastId === 0) {
             this.lastPolledMessageId.set(target, msg.id);
-            if (!isRecent) continue;
-          } else if (msg.id <= lastId) {
-            continue;
+            if (isRecent) {
+              messagesToProcess.push(msg);
+            }
+          } else if (msg.id > lastId) {
+            this.lastPolledMessageId.set(target, msg.id);
+            const gap = msg.id - lastId;
+            if (gap === 1) {
+              messagesToProcess.push(msg);
+            } else if (gap > 1) {
+              // Oradagi xabarlar (ketma-ket tashlangan postlar) tushib qolmasligi uchun
+              try {
+                const missed = await this.client.getMessages(target, { limit: Math.min(gap, 10) });
+                if (missed && missed.length > 0) {
+                  const sorted = [...missed]
+                    .filter((m: any) => m && m.id && m.id > lastId)
+                    .sort((a: any, b: any) => a.id - b.id);
+                  messagesToProcess.push(...sorted);
+                } else {
+                  messagesToProcess.push(msg);
+                }
+              } catch {
+                messagesToProcess.push(msg);
+              }
+            }
           }
 
-          this.lastPolledMessageId.set(target, Math.max(lastId, msg.id));
-          const text = (msg.message || msg.text || '').trim();
-          if (!text) continue;
+          for (const m of messagesToProcess) {
+            const mText = (m.message || m.text || '').trim();
+            if (!mText) continue;
 
-          const channelName = d.title || username || matchedDbIdent;
-          const uniqueId = `${target}_msg_${msg.id}`;
-          if (this.processedMessageIds.has(uniqueId)) continue;
+            const channelName = d.title || username || matchedDbIdent;
+            const uniqueId = `${target}_msg_${m.id}`;
+            if (this.processedMessageIds.has(uniqueId)) continue;
 
-          this.logger.info(
-            'telegram',
-            `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
-            { preview: text.slice(0, 120), chatId: target },
-          );
+            this.markMessageAsSeen(uniqueId);
 
-          await this.sendFinal(target, [msg], text, uniqueId, channelName);
+            this.logger.info(
+              'telegram',
+              `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${matchedDbIdent})`,
+              { preview: mText.slice(0, 120), chatId: target, msgId: m.id },
+            );
+
+            // Mustaqil asinxron bajarish: bitta kanalning AI/forward jarayoni boshqa kanallarni to'xtatmaydi!
+            this.sendFinal(target, [m], mText, uniqueId, channelName).catch((err: any) => {
+              this.logger.error('telegram', `Xabarni qayta ishlashda xatolik (${uniqueId}): ${err?.message || err}`);
+            });
+          }
         }
       } catch (err: any) {
         this.logger.error('telegram', `Monitoring poller xatosi: ${err?.message || err}`);
       } finally {
         isPolling = false;
       }
-    }, 5000);
+    }, 4000);
   }
 
   private async handleOutgoingCommand(event: any) {
