@@ -25,6 +25,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       CREATE TABLE IF NOT EXISTS channels (
         ident TEXT PRIMARY KEY
       );
+      ALTER TABLE channels ADD COLUMN IF NOT EXISTS channel_id TEXT;
+      ALTER TABLE channels ADD COLUMN IF NOT EXISTS username TEXT;
+      ALTER TABLE channels ADD COLUMN IF NOT EXISTS title TEXT;
       CREATE TABLE IF NOT EXISTS keywords (
         word TEXT PRIMARY KEY
       );
@@ -68,13 +71,54 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return this.pool.query(text, params);
   }
 
+  cleanChannelInput(input: string): string {
+    if (!input) return '';
+    let clean = input.trim();
+    const cLinkMatch = clean.match(/t\.me\/c\/(\d+)/i);
+    if (cLinkMatch) {
+      return cLinkMatch[1];
+    }
+    clean = clean.replace(/^https?:\/\/t\.me\//i, '');
+    clean = clean.replace(/^@/, '');
+    clean = clean.split('/')[0].split('?')[0].trim();
+    return clean;
+  }
+
   async getChannels(): Promise<any[]> {
     const res = await this.query('SELECT ident FROM channels ORDER BY ident ASC');
     return res.rows.map((r: any) => r.ident);
   }
 
+  async getChannelsDetailed(): Promise<any[]> {
+    const res = await this.query('SELECT ident, channel_id, username, title FROM channels ORDER BY ident ASC');
+    return res.rows;
+  }
+
+  async updateChannelDetails(ident: string, details: { channelId?: string; username?: string; title?: string }): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (details.channelId !== undefined) {
+      fields.push(`channel_id = $${idx++}`);
+      values.push(details.channelId);
+    }
+    if (details.username !== undefined) {
+      fields.push(`username = $${idx++}`);
+      values.push(details.username);
+    }
+    if (details.title !== undefined) {
+      fields.push(`title = $${idx++}`);
+      values.push(details.title);
+    }
+
+    if (fields.length === 0) return;
+    values.push(ident);
+    await this.query(`UPDATE channels SET ${fields.join(', ')} WHERE ident = $${idx}`, values);
+  }
+
   async addChannel(ident: string): Promise<boolean> {
-    const clean = ident.replace('https://t.me/', '').replace('@', '').trim();
+    const clean = this.cleanChannelInput(ident);
     if (!clean) return false;
     const res = await this.query(
       'INSERT INTO channels (ident) VALUES ($1) ON CONFLICT (ident) DO NOTHING',
@@ -84,15 +128,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async updateChannel(oldIdent: string, newIdent: string): Promise<boolean> {
-    const cleanOld = oldIdent.replace('https://t.me/', '').replace('@', '').trim();
-    const cleanNew = newIdent.replace('https://t.me/', '').replace('@', '').trim();
+    const cleanOld = this.cleanChannelInput(oldIdent);
+    const cleanNew = this.cleanChannelInput(newIdent);
     if (!cleanNew) return false;
     const res = await this.query('UPDATE channels SET ident = $1 WHERE ident = $2', [cleanNew, cleanOld]);
     return (res.rowCount ?? 0) > 0;
   }
 
   async deleteChannel(ident: string): Promise<boolean> {
-    const clean = ident.replace('https://t.me/', '').replace('@', '').trim();
+    const clean = this.cleanChannelInput(ident);
     const res = await this.query('DELETE FROM channels WHERE ident = $1', [clean]);
     return (res.rowCount ?? 0) > 0;
   }

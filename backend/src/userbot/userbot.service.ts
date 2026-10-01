@@ -29,6 +29,12 @@ export class UserbotService implements OnModuleInit {
   private isCacheRefreshing = false;
   private cacheRefreshTimer: any = null;
   private activeGroqModel: string | null = null;
+  private cachedChannels: string[] = [];
+  private cachedKeywords: string[] = [];
+  private processedMessageIds: Set<string> = new Set();
+  private fallbackPollerTimer: any = null;
+  private pollerIndex = 0;
+  private lastPolledMessageId: Map<string, number> = new Map();
 
   constructor(
     private readonly db: DatabaseService,
@@ -115,6 +121,7 @@ export class UserbotService implements OnModuleInit {
 
       await this.refreshDialogsAndChannelsCache();
       this.registerHandlers();
+      this.startFallbackPoller();
 
       if (this.cacheRefreshTimer) clearInterval(this.cacheRefreshTimer);
       this.cacheRefreshTimer = setInterval(() => {
@@ -132,18 +139,25 @@ export class UserbotService implements OnModuleInit {
     if (!id) return [];
     const str = id.toString().trim();
     const digits = str.replace(/[^0-9]/g, '');
-    if (!digits) return [str.toLowerCase()];
-    return [
-      digits,
-      `-${digits}`,
-      `-100${digits}`,
-    ];
+    if (!digits) return [str.toLowerCase(), `@${str.toLowerCase()}`];
+
+    const cleanDigits = (digits.startsWith('100') && digits.length > 10) ? digits.slice(3) : digits;
+
+    const variants = new Set<string>();
+    variants.add(cleanDigits);
+    variants.add(`-${cleanDigits}`);
+    variants.add(`-100${cleanDigits}`);
+    variants.add(digits);
+    variants.add(`-${digits}`);
+    variants.add(`-100${digits}`);
+    variants.add(str.toLowerCase());
+    return Array.from(variants);
   }
 
   cacheChannelEntry(entry: ChannelCacheEntry) {
     if (entry.id) {
-      this.channelCache.set(entry.id, entry);
-      this.channelCache.set(`-${entry.id}`, entry);
+      const variants = this.getNormalizedIdVariants(entry.id);
+      variants.forEach((v) => this.channelCache.set(v, entry));
     }
     if (entry.markedId) {
       this.channelCache.set(entry.markedId, entry);
@@ -154,7 +168,7 @@ export class UserbotService implements OnModuleInit {
       this.channelCache.set(`@${u}`, entry);
     }
     if (entry.dbIdent) {
-      const clean = entry.dbIdent.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+      const clean = this.db.cleanChannelInput(entry.dbIdent).toLowerCase();
       this.channelCache.set(clean, entry);
       this.channelCache.set(`@${clean}`, entry);
     }
@@ -162,22 +176,28 @@ export class UserbotService implements OnModuleInit {
 
   async resolveAndCacheChannel(ident: string): Promise<ChannelCacheEntry | null> {
     if (!this.client || !this.isConnected) return null;
-    const clean = ident.replace('https://t.me/', '').replace('@', '').trim();
+    const clean = this.db.cleanChannelInput(ident);
     if (!clean) return null;
     try {
       const ent: any = await this.client.getEntity(clean);
       if (ent && ent.id) {
-        const id = ent.id.toString();
+        const rawDigits = ent.id.toString().replace(/[^0-9]/g, '');
+        const trueChannelId = (rawDigits.startsWith('100') && rawDigits.length > 10) ? rawDigits.slice(3) : rawDigits;
         const username = (ent.username || '').toLowerCase().trim();
         const title = ent.title || username || clean;
         const entry: ChannelCacheEntry = {
-          id,
-          markedId: id.startsWith('-100') ? id : `-100${id}`,
+          id: trueChannelId,
+          markedId: `-100${trueChannelId}`,
           username: username || undefined,
           title,
           dbIdent: ident,
         };
         this.cacheChannelEntry(entry);
+        await this.db.updateChannelDetails(ident, {
+          channelId: trueChannelId,
+          username: username || undefined,
+          title,
+        }).catch(() => {});
         return entry;
       }
     } catch { }
@@ -188,26 +208,40 @@ export class UserbotService implements OnModuleInit {
     if (!this.client || !this.isConnected || this.isCacheRefreshing) return;
     this.isCacheRefreshing = true;
     try {
+      this.cachedChannels = await this.db.getChannels();
+      this.cachedKeywords = await this.db.getKeywords();
+
       const dialogs = await this.client.getDialogs({ limit: 1000 });
       for (const d of dialogs) {
         const entity = d.entity;
         const rawId = d.id?.toString() || entity?.id?.toString();
         if (!rawId) continue;
-        const digits = rawId.replace(/[^0-9]/g, '');
+        const rawDigits = rawId.replace(/[^0-9]/g, '');
+        const trueChannelId = (rawDigits.startsWith('100') && rawDigits.length > 10) ? rawDigits.slice(3) : rawDigits;
         const username = (entity?.username || '').toLowerCase().trim();
         const title = d.title || entity?.title || username || rawId;
         const entry: ChannelCacheEntry = {
-          id: digits,
-          markedId: `-100${digits}`,
+          id: trueChannelId,
+          markedId: `-100${trueChannelId}`,
           username: username || undefined,
           title,
         };
         this.cacheChannelEntry(entry);
+
+        for (const ch of this.cachedChannels) {
+          const clean = this.db.cleanChannelInput(ch).toLowerCase();
+          if (clean === username || clean === trueChannelId || clean === rawDigits || clean === `-100${trueChannelId}`) {
+            await this.db.updateChannelDetails(ch, {
+              channelId: trueChannelId,
+              username: username || undefined,
+              title,
+            }).catch(() => {});
+          }
+        }
       }
 
-      const dbChannels = await this.db.getChannels();
-      for (const ch of dbChannels) {
-        const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+      for (const ch of this.cachedChannels) {
+        const clean = this.db.cleanChannelInput(ch).toLowerCase();
         if (!this.channelCache.has(clean) && !this.channelCache.has(`@${clean}`)) {
           await this.resolveAndCacheChannel(ch);
         }
@@ -248,6 +282,54 @@ export class UserbotService implements OnModuleInit {
     }, new EditedMessage({}));
 
     this.logger.info('telegram', 'Xabarlarni tinglash xizmati (NewMessage + EditedMessage) faollashtirildi');
+  }
+
+  private startFallbackPoller() {
+    if (this.fallbackPollerTimer) clearInterval(this.fallbackPollerTimer);
+    this.fallbackPollerTimer = setInterval(async () => {
+      if (!this.client || !this.isConnected || this.cachedChannels.length === 0) return;
+      try {
+        const batchSize = 2;
+        const total = this.cachedChannels.length;
+        for (let i = 0; i < batchSize; i++) {
+          const ch = this.cachedChannels[this.pollerIndex % total];
+          this.pollerIndex = (this.pollerIndex + 1) % total;
+          if (!ch) continue;
+
+          const clean = this.db.cleanChannelInput(ch);
+          const cached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
+          const target = cached?.id ? (cached.id.startsWith('-100') ? cached.id : `-100${cached.id}`) : clean;
+
+          const lastId = this.lastPolledMessageId.get(ch) || 0;
+          try {
+            const msgs = await this.client.getMessages(target, { limit: 5 });
+            if (msgs && msgs.length > 0) {
+              const maxId = Math.max(...msgs.map((m: any) => m.id || 0));
+              if (lastId === 0) {
+                this.lastPolledMessageId.set(ch, maxId);
+                continue;
+              }
+              this.lastPolledMessageId.set(ch, Math.max(lastId, maxId));
+
+              for (const m of msgs) {
+                if (m.id > lastId) {
+                  const text = (m.message || m.text || '').trim();
+                  if (!text) continue;
+                  const channelName = cached?.title || ch;
+                  const uniqueId = `${target}_msg_${m.id}`;
+                  if (this.processedMessageIds.has(uniqueId)) continue;
+                  await this.sendFinal(target, [m], text, uniqueId, channelName);
+                }
+              }
+            }
+          } catch {
+            // Ignore individual channel poll errors
+          }
+        }
+      } catch (err: any) {
+        // Poller cycle error
+      }
+    }, 5000);
   }
 
   private async handleOutgoingCommand(event: any) {
@@ -383,7 +465,7 @@ export class UserbotService implements OnModuleInit {
     const chatTitle = cached?.title || chat?.title || (username ? `@${username}` : null) || rawChatId || 'Noma\'lum chat';
     const effectiveChatId = rawChatId || (peerChannelId ? `-100${peerChannelId}` : (cached?.markedId || chatEntityId));
 
-    const targetChannels = await this.db.getChannels();
+    const targetChannels = this.cachedChannels.length > 0 ? this.cachedChannels : await this.db.getChannels();
     if (!targetChannels || targetChannels.length === 0) return;
 
     // Build incoming chat ID variants
@@ -401,7 +483,7 @@ export class UserbotService implements OnModuleInit {
 
     let matchedChannel: string | null = null;
     for (const ch of targetChannels) {
-      const clean = ch.replace('https://t.me/', '').replace('@', '').toLowerCase().trim();
+      const clean = this.db.cleanChannelInput(ch).toLowerCase();
       // A. Match username
       if (username && (clean === username || `@${clean}` === `@${username}`)) {
         matchedChannel = ch;
@@ -431,7 +513,6 @@ export class UserbotService implements OnModuleInit {
     }
 
     if (!matchedChannel) {
-      // If it's a channel, supergroup, or chat, log so user can see it in live logs
       if (peerChannelId || rawChatId.startsWith('-100') || event.isChannel) {
         this.logger.info(
           'telegram',
@@ -451,7 +532,10 @@ export class UserbotService implements OnModuleInit {
     if (msg.groupedId) {
       const gid = msg.groupedId.toString();
       const uniqueId = `${effectiveChatId}_album_${gid}`;
-      if (await this.db.isAlreadySent(uniqueId)) return;
+      if (this.processedMessageIds.has(uniqueId) || await this.db.isAlreadySent(uniqueId)) {
+        this.markMessageAsSeen(uniqueId);
+        return;
+      }
 
       if (!this.albumBuffer.has(gid)) {
         this.albumBuffer.set(gid, { ids: [], chatId: effectiveChatId, task: null, channelName: chatTitle });
@@ -469,6 +553,7 @@ export class UserbotService implements OnModuleInit {
     }
 
     const uniqueId = `${effectiveChatId}_msg_${msg.id}`;
+    if (this.processedMessageIds.has(uniqueId)) return;
     await this.sendFinal(effectiveChatId, [msg], text, uniqueId, chatTitle);
   }
 
@@ -488,6 +573,7 @@ export class UserbotService implements OnModuleInit {
       }
 
       const uniqueId = `${chatId}_album_${groupedId}`;
+      if (this.processedMessageIds.has(uniqueId)) return;
       if (longestText.trim()) {
         const validMsgs = msgs.filter((m: any) => m !== null && m !== undefined);
         await this.sendFinal(chatId, validMsgs, longestText, uniqueId, channelName || chatId);
@@ -499,14 +585,25 @@ export class UserbotService implements OnModuleInit {
     }
   }
 
+  private markMessageAsSeen(id: string) {
+    this.processedMessageIds.add(id);
+    if (this.processedMessageIds.size > 5000) {
+      const first = this.processedMessageIds.values().next().value;
+      if (first) this.processedMessageIds.delete(first);
+    }
+  }
+
   private async sendFinal(sourceChat: string, messages: any[], text: string, uniqueId: string, channelName: string) {
+    if (this.processedMessageIds.has(uniqueId)) return;
+    this.markMessageAsSeen(uniqueId);
+
     if (await this.db.isAlreadySent(uniqueId)) {
       this.logger.info('telegram', `Xabar allaqachon qayta ishlangan: ${uniqueId}`);
       return;
     }
 
     const clean = this.normalizeText(text);
-    const keywords = await this.db.getKeywords();
+    const keywords = this.cachedKeywords.length > 0 ? this.cachedKeywords : await this.db.getKeywords();
 
     let foundKw = null;
     for (const k of keywords) {
