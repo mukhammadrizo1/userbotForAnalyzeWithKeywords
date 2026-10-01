@@ -289,47 +289,59 @@ export class UserbotService implements OnModuleInit {
     this.fallbackPollerTimer = setInterval(async () => {
       if (!this.client || !this.isConnected || this.cachedChannels.length === 0) return;
       try {
-        const batchSize = 2;
+        const batchSize = 6;
         const total = this.cachedChannels.length;
+        const channelsToPoll: string[] = [];
         for (let i = 0; i < batchSize; i++) {
           const ch = this.cachedChannels[this.pollerIndex % total];
           this.pollerIndex = (this.pollerIndex + 1) % total;
-          if (!ch) continue;
+          if (ch) channelsToPoll.push(ch);
+        }
 
-          const clean = this.db.cleanChannelInput(ch);
-          const cached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
-          const target = cached?.id ? (cached.id.startsWith('-100') ? cached.id : `-100${cached.id}`) : clean;
+        await Promise.all(
+          channelsToPoll.map(async (ch) => {
+            const clean = this.db.cleanChannelInput(ch);
+            const cached = this.channelCache.get(clean) || this.channelCache.get(`@${clean}`);
+            const target = cached?.id ? (cached.id.startsWith('-100') ? cached.id : `-100${cached.id}`) : clean;
 
-          const lastId = this.lastPolledMessageId.get(ch) || 0;
-          try {
-            const msgs = await this.client.getMessages(target, { limit: 5 });
-            if (msgs && msgs.length > 0) {
-              const maxId = Math.max(...msgs.map((m: any) => m.id || 0));
-              if (lastId === 0) {
-                this.lastPolledMessageId.set(ch, maxId);
-                continue;
-              }
-              this.lastPolledMessageId.set(ch, Math.max(lastId, maxId));
+            const lastId = this.lastPolledMessageId.get(ch) || 0;
+            try {
+              const msgs = await this.client.getMessages(target, { limit: 5 });
+              if (msgs && msgs.length > 0) {
+                const maxId = Math.max(...msgs.map((m: any) => m.id || 0));
+                if (lastId === 0) {
+                  this.lastPolledMessageId.set(ch, maxId);
+                  return;
+                }
+                this.lastPolledMessageId.set(ch, Math.max(lastId, maxId));
 
-              for (const m of msgs) {
-                if (m.id > lastId) {
-                  const text = (m.message || m.text || '').trim();
-                  if (!text) continue;
-                  const channelName = cached?.title || ch;
-                  const uniqueId = `${target}_msg_${m.id}`;
-                  if (this.processedMessageIds.has(uniqueId)) continue;
-                  await this.sendFinal(target, [m], text, uniqueId, channelName);
+                for (const m of msgs) {
+                  if (m.id > lastId) {
+                    const text = (m.message || m.text || '').trim();
+                    if (!text) continue;
+                    const channelName = cached?.title || ch;
+                    const uniqueId = `${target}_msg_${m.id}`;
+                    if (this.processedMessageIds.has(uniqueId)) continue;
+
+                    this.logger.info(
+                      'telegram',
+                      `🎯 Kuzatilayotgan kanaldan yangi xabar: "${channelName}" (Bazada: ${ch})`,
+                      { preview: text.slice(0, 120), chatId: target },
+                    );
+
+                    await this.sendFinal(target, [m], text, uniqueId, channelName);
+                  }
                 }
               }
+            } catch {
+              // Ignore single channel errors
             }
-          } catch {
-            // Ignore individual channel poll errors
-          }
-        }
-      } catch (err: any) {
-        // Poller cycle error
+          }),
+        );
+      } catch {
+        // Poller cycle catch
       }
-    }, 5000);
+    }, 1500);
   }
 
   private async handleOutgoingCommand(event: any) {
