@@ -157,6 +157,8 @@ export class ApiService {
   }
 
   getLogsStreamUrl(): string {
-    return `${this.base}/logs/stream`;
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') || '' : '';
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${this.base}/logs/stream${tokenParam}`;
   }
 }
