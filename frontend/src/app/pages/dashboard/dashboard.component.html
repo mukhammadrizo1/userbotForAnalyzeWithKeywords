@@ -43,6 +43,7 @@
               <span *ngSwitchCase="'groups'">Guruhlar & Yo'naltirish</span>
               <span *ngSwitchCase="'history'">Tahlil Tarixi</span>
               <span *ngSwitchCase="'tester'">AI Sinov Maydoni</span>
+              <span *ngSwitchCase="'inspector'">Vaqt Oralig'i Tahlili</span>
               <span *ngSwitchCase="'logs'">Jonli Tizim Loglari</span>
               <span *ngSwitchCase="'system'">Tizim & AI Holati</span>
               <span *ngSwitchDefault>Boshqaruv Paneli</span>
@@ -55,6 +56,7 @@
               <span *ngSwitchCase="'groups'">Tahlil natijalariga ko'ra xabarlar yo'naltiriladigan guruhlar</span>
               <span *ngSwitchCase="'history'">Groq AI tahlilidan o'tgan so'nggi 50 ta xabarlar arxivi</span>
               <span *ngSwitchCase="'tester'">Xabarlarni Groq AI va kalit so'zlar bo'yicha mustaqil sinovdan o'tkazish</span>
+              <span *ngSwitchCase="'inspector'">Telegram kanallaridagi o'tmishdagi postlarni tahlil qilish va ommaviy yo'naltirish</span>
               <span *ngSwitchCase="'logs'">Userbot va AI xizmatlarining real-vaqtdagi jarayonlarini kuzatish</span>
               <span *ngSwitchCase="'system'">Telegram MTProto va Groq Llama 3 tizim holati parametrlari</span>
               <span *ngSwitchDefault>UTY Monitoring va AI filtr boshqaruvi</span>
@@ -145,6 +147,12 @@
       <app-tester
         *ngIf="activeSection() === 'tester'"
       ></app-tester>
+
+      <app-inspector
+        *ngIf="activeSection() === 'inspector'"
+        [channels]="channels()"
+        [keywords]="keywords()"
+      ></app-inspector>
 
       <app-system-status
         *ngIf="activeSection() === 'system'"

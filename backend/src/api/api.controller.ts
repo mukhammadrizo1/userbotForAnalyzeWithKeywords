@@ -190,6 +190,18 @@ export class ApiController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('inspector/scan')
+  async scanHistoricalRange(@Body() body: any): Promise<any> {
+    return this.userbot.scanHistoricalRange(body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('inspector/forward')
+  async forwardInspectedPosts(@Body() body: any): Promise<any> {
+    return this.userbot.forwardInspectedPosts(body);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('system/mode')
   async getSystemMode(): Promise<any> {
     return this.userbot.getSystemMode();

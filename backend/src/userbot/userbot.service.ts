@@ -1373,5 +1373,301 @@ Javob faqat bitta so'z bo'lsin.`;
     }
     return this.getSystemMode();
   }
+
+  async scanHistoricalRange(options: {
+    channels?: string[];
+    customChannel?: string;
+    startDate: string;
+    endDate: string;
+    keywordMode: 'all' | 'selected' | 'custom' | 'none';
+    selectedKeywords?: string[];
+    customKeywords?: string[];
+    limitPerChannel?: number;
+  }): Promise<any> {
+    if (!this.client || !this.isConnected) {
+      return { success: false, error: 'Telegram userbot ulanmagan' };
+    }
+
+    const startTs = Math.floor(new Date(options.startDate).getTime() / 1000);
+    const endTs = Math.floor(new Date(options.endDate).getTime() / 1000);
+
+    if (isNaN(startTs) || isNaN(endTs) || startTs > endTs) {
+      return { success: false, error: 'Noto\'g\'ri vaqt oralig\'i tanlandi' };
+    }
+
+    // Prepare keywords
+    let keywordsToMatch: string[] = [];
+    if (options.keywordMode === 'all') {
+      keywordsToMatch = this.cachedKeywords.length > 0 ? this.cachedKeywords : await this.db.getKeywords();
+    } else if (options.keywordMode === 'selected') {
+      keywordsToMatch = (options.selectedKeywords || []).map((k) => k.trim()).filter((k) => k.length > 0);
+    } else if (options.keywordMode === 'custom') {
+      keywordsToMatch = (options.customKeywords || []).map((k) => k.trim()).filter((k) => k.length > 0);
+    }
+
+    const normalizedKeywords = keywordsToMatch.map((k) => ({
+      raw: k,
+      normalized: this.normalizeText(k),
+    }));
+
+    // Prepare channels list
+    let channelsToScan: string[] = [];
+    if (options.customChannel && options.customChannel.trim()) {
+      channelsToScan = [options.customChannel.trim()];
+    } else if (options.channels && options.channels.includes('all')) {
+      channelsToScan = this.cachedChannels.length > 0 ? this.cachedChannels : await this.db.getChannels();
+    } else if (options.channels && options.channels.length > 0) {
+      channelsToScan = options.channels;
+    } else {
+      channelsToScan = this.cachedChannels.length > 0 ? this.cachedChannels : await this.db.getChannels();
+    }
+
+    const limitPerChannel = Math.min(options.limitPerChannel || 50, 100);
+    const matchedPosts: any[] = [];
+    let scannedCount = 0;
+    let skippedPrivateCount = 0;
+
+    this.logger.info(
+      'telegram',
+      `🔎 Vaqt oralig'i bo'yicha tahlil boshlandi: ${channelsToScan.length} ta kanal, oraliq: ${new Date(startTs * 1000).toLocaleString('uz-UZ')} - ${new Date(endTs * 1000).toLocaleString('uz-UZ')}`,
+    );
+
+    for (const ch of channelsToScan) {
+      if (matchedPosts.length >= 250) {
+        // Prevent excessive payload size / memory bloat
+        break;
+      }
+
+      const cleanInput = this.db.cleanChannelInput(ch);
+      if (!cleanInput) continue;
+
+      // Check if it's a private join link (+ or joinchat)
+      if (cleanInput.startsWith('+') || cleanInput.includes('joinchat')) {
+        // As requested: ignore if not already joined
+        const cached = this.channelCache.get(cleanInput);
+        if (!cached) {
+          skippedPrivateCount++;
+          continue;
+        }
+      }
+
+      let entity: any = null;
+      try {
+        entity = await this.client.getEntity(cleanInput);
+      } catch (err: any) {
+        // Could be private or inaccessible without joining, skip gracefully
+        skippedPrivateCount++;
+        continue;
+      }
+
+      if (!entity) continue;
+      scannedCount++;
+
+      const rawEntityId = entity.id ? entity.id.toString() : '';
+      const cleanDigits = rawEntityId.replace(/[^0-9]/g, '');
+      const trueChannelId = (cleanDigits.startsWith('100') && cleanDigits.length > 10) ? cleanDigits.slice(3) : cleanDigits;
+      const rawChatId = trueChannelId ? `-100${trueChannelId}` : rawEntityId;
+      const channelTitle = entity.title || entity.username || ch;
+      const channelUsername = entity.username || undefined;
+
+      try {
+        const messages = await this.client.getMessages(entity, {
+          limit: limitPerChannel,
+          offsetDate: endTs,
+        });
+
+        if (!messages || messages.length === 0) continue;
+
+        for (const msg of messages) {
+          if (!msg || !msg.date) continue;
+          if (msg.date < startTs) {
+            // Older than range, break out of this channel's loop
+            break;
+          }
+          if (msg.date > endTs) continue;
+
+          const text = msg.message || '';
+          if (!text.trim()) continue;
+
+          const matchedKeywords: string[] = [];
+          if (options.keywordMode !== 'none') {
+            const cleanText = this.normalizeText(text);
+            for (const kw of normalizedKeywords) {
+              if (kw.normalized && cleanText.includes(kw.normalized)) {
+                matchedKeywords.push(kw.raw);
+              }
+            }
+            if (matchedKeywords.length === 0) continue;
+          }
+
+          const uniqueId = `${rawChatId}_msg_${msg.id}`;
+          const postLink = channelUsername
+            ? `https://t.me/${channelUsername}/${msg.id}`
+            : `https://t.me/c/${trueChannelId || rawChatId.replace(/^-100/, '')}/${msg.id}`;
+
+          matchedPosts.push({
+            uniqueId,
+            channel: ch,
+            channelTitle,
+            channelUsername,
+            rawChatId,
+            rawMsgId: msg.id,
+            date: new Date(msg.date * 1000).toISOString(),
+            text,
+            matchedKeywords,
+            postLink,
+            mediaType: msg.photo ? 'photo' : msg.video ? 'video' : msg.document ? 'document' : 'text',
+          });
+
+          if (matchedPosts.length >= 250) break;
+        }
+      } catch (err: any) {
+        // Individual channel read error, continue
+      }
+
+      // Small throttle delay between channels to avoid FloodWait
+      await new Promise((r) => setTimeout(r, 80));
+    }
+
+    // Cross-reference with DB to check if already sent
+    if (matchedPosts.length > 0) {
+      const uniqueIds = matchedPosts.map((p) => p.uniqueId);
+      const historyMap = await this.db.getHistoryItemsMap(uniqueIds);
+      for (const p of matchedPosts) {
+        const item = historyMap.get(p.uniqueId);
+        if (item) {
+          p.isAlreadySent = true;
+          p.existingStatus = item.status || 'SENT';
+          p.existingSentiment = item.sentiment || null;
+        } else {
+          p.isAlreadySent = false;
+          p.existingStatus = 'NOT_SENT';
+          p.existingSentiment = null;
+        }
+      }
+    }
+
+    this.logger.success(
+      'telegram',
+      `Vaqt oralig'i tahlili yakunlandi: ${scannedCount} ta kanal tekshirildi, ${matchedPosts.length} ta mos keluvchi post topildi (${skippedPrivateCount} ta yopiq kanal o'tkazib yuborildi)`,
+    );
+
+    return {
+      success: true,
+      totalScannedChannels: scannedCount,
+      skippedPrivateChannels: skippedPrivateCount,
+      totalFound: matchedPosts.length,
+      posts: matchedPosts,
+    };
+  }
+
+  async forwardInspectedPosts(options: {
+    posts: Array<{
+      rawChatId: string;
+      rawMsgId: number;
+      text: string;
+      postLink?: string;
+      uniqueId?: string;
+      channelTitle?: string;
+    }>;
+    targetMode: 'groupType' | 'customTarget';
+    groupType?: 'GOOD' | 'BAD' | 'NEUTRAL';
+    customTarget?: string;
+    markAsSentInDb?: boolean;
+  }): Promise<any> {
+    if (!this.client || !this.isConnected) {
+      return { success: false, error: 'Telegram userbot ulanmagan' };
+    }
+
+    if (!options.posts || options.posts.length === 0) {
+      return { success: false, error: 'Hech qanday post tanlanmagan' };
+    }
+
+    let destinations: string[] = [];
+    if (options.targetMode === 'groupType') {
+      const type = (options.groupType || 'GOOD').toLowerCase();
+      const groups = await this.db.getGroups(type);
+      destinations = groups.map((g) => g.group_id);
+      if (destinations.length === 0) {
+        return { success: false, error: `"${options.groupType}" toifasi uchun birorta ham guruh topilmadi` };
+      }
+    } else if (options.targetMode === 'customTarget') {
+      if (!options.customTarget || !options.customTarget.trim()) {
+        return { success: false, error: 'Ixtiyoriy chat ID yoki username kiritilmadi' };
+      }
+      destinations = [options.customTarget.trim()];
+    }
+
+    let forwardedCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+
+    this.logger.info(
+      'forward',
+      `Qo'lda yo'naltirish boshlandi: ${options.posts.length} ta post, ${destinations.length} ta manzilga...`,
+    );
+
+    for (const post of options.posts) {
+      for (const dest of destinations) {
+        try {
+          let destEntity: any = dest;
+          try {
+            destEntity = await this.client.getInputEntity(dest);
+          } catch {
+            destEntity = dest;
+          }
+
+          let sentSuccessfully = false;
+          try {
+            await this.client.forwardMessages(destEntity, {
+              messages: [post.rawMsgId],
+              fromPeer: post.rawChatId,
+            });
+            sentSuccessfully = true;
+          } catch (fwdErr: any) {
+            // Fallback: send text with source link
+            const fallbackText = `${post.text}\n\n🔗 Manba: ${post.postLink || ''}`;
+            await this.client.sendMessage(destEntity, {
+              message: fallbackText,
+              linkPreview: false,
+            });
+            sentSuccessfully = true;
+          }
+
+          if (sentSuccessfully) {
+            forwardedCount++;
+            if (options.markAsSentInDb && post.uniqueId) {
+              await this.db.markAsSent(
+                post.uniqueId,
+                post.text.slice(0, 1000),
+                options.groupType || 'MANUAL',
+                post.channelTitle || 'Manual Forward',
+                'SENT',
+                undefined,
+                post.postLink,
+                post.rawChatId,
+                post.rawMsgId,
+              );
+            }
+          }
+        } catch (err: any) {
+          failedCount++;
+          errors.push(`Post #${post.rawMsgId} -> ${dest}: ${err?.message || err}`);
+        }
+
+        // Throttle
+        await new Promise((r) => setTimeout(r, 120));
+      }
+    }
+
+    this.logger.success('forward', `Yo'naltirish yakunlandi: ${forwardedCount} ta yuborildi, ${failedCount} ta xato`);
+
+    return {
+      success: true,
+      forwardedCount,
+      failedCount,
+      errors: errors.slice(0, 10),
+    };
+  }
 }
 

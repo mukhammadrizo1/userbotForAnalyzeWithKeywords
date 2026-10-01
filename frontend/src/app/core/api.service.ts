@@ -108,6 +108,14 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/tester/analyze`, { text });
   }
 
+  scanHistoricalRange(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/inspector/scan`, payload);
+  }
+
+  forwardInspectedPosts(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/inspector/forward`, payload);
+  }
+
   getSystemMode(): Observable<any> {
     return this.http.get<any>(`${this.base}/system/mode`);
   }

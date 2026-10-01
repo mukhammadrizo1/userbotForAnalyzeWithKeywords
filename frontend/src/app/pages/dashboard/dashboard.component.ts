@@ -13,6 +13,7 @@ import { HistoryComponent } from './components/history/history.component';
 import { SystemStatusComponent } from './components/system-status/system-status.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { TesterComponent } from './components/tester/tester.component';
+import { InspectorComponent } from './components/inspector/inspector.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -30,6 +31,7 @@ import { TesterComponent } from './components/tester/tester.component';
     SystemStatusComponent,
     LogsComponent,
     TesterComponent,
+    InspectorComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
@@ -89,6 +91,10 @@ export class DashboardComponent implements OnInit {
         break;
       case 'history':
         this.loadHistory();
+        break;
+      case 'inspector':
+        if (this.channels().length === 0) this.loadChannels();
+        if (this.keywords().length === 0) this.loadKeywords();
         break;
       case 'system':
         this.loadStatus();

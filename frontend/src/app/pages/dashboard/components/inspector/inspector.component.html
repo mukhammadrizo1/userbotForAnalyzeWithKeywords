@@ -1,0 +1,549 @@
+<div class="inspector-wrapper">
+  <!-- 1. SOZLAMALAR KARTASI -->
+  <div class="filter-card">
+    <div class="card-header">
+      <div class="header-icon-box">
+        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">Vaqt Oralig'i Tahlili (Historical Range Inspector)</h2>
+        <p class="card-subtitle">Telegram kanallaridagi o'tmishdagi postlarni vaqt va kalit so'zlar bo'yicha tahlil qilish hamda qayta yo'naltirish</p>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <!-- A. QAYSI KANALLAR -->
+      <div class="setting-group">
+        <label class="group-label">1. Qaysi Kanallarni Tekshirish?</label>
+        <div class="segmented-control">
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="channelScope() === 'all'"
+            (click)="channelScope.set('all')"
+          >
+            Barcha Kanallar ({{ _dbChannels().length }})
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="channelScope() === 'selected'"
+            (click)="channelScope.set('selected')"
+          >
+            Tanlangan Kanallar
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="channelScope() === 'custom'"
+            (click)="channelScope.set('custom')"
+          >
+            Maxsus Kanal
+          </button>
+        </div>
+
+        <!-- Custom Channel Input -->
+        <div *ngIf="channelScope() === 'custom'" class="sub-input-box">
+          <input
+            type="text"
+            class="dash-input"
+            [(ngModel)]="customChannelInput"
+            placeholder="Kanal username yoki havolasi (masalan: @gazetauz yoki https://t.me/daryo)"
+          />
+          <span class="input-hint">ℹ️ Begona ommaviy kanallarni ham a'zo bo'lmasdan tekshira oladi</span>
+        </div>
+
+        <!-- Selected Channels Multi-select Chips -->
+        <div *ngIf="channelScope() === 'selected'" class="sub-input-box">
+          <div class="channels-chips-grid">
+            <button
+              *ngFor="let ch of _dbChannels()"
+              type="button"
+              class="chip-btn"
+              [class.active]="selectedChannelIdents().includes(ch.ident || ch.title)"
+              (click)="toggleChannelSelection(ch.ident || ch.title)"
+            >
+              {{ ch.title || ch.username || ch.ident }}
+            </button>
+          </div>
+          <span class="input-hint">Tanlandi: {{ selectedChannelIdents().length }} ta kanal</span>
+        </div>
+      </div>
+
+      <!-- B. VAQT ORALIG'I -->
+      <div class="setting-group">
+        <label class="group-label">2. Vaqt Oralig'i (Date Range)</label>
+        <div class="preset-buttons">
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="presetRange() === '3h'"
+            (click)="applyPreset('3h')"
+          >
+            Oxirgi 3 soat
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="presetRange() === 'today'"
+            (click)="applyPreset('today')"
+          >
+            Bugun
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="presetRange() === '24h'"
+            (click)="applyPreset('24h')"
+          >
+            Oxirgi 24 soat
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="presetRange() === '3d'"
+            (click)="applyPreset('3d')"
+          >
+            Oxirgi 3 kun
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="presetRange() === 'custom'"
+            (click)="presetRange.set('custom')"
+          >
+            Maxsus sana
+          </button>
+        </div>
+
+        <div class="date-pickers-row">
+          <div class="date-input-wrap">
+            <span class="date-label">Boshlanish:</span>
+            <input
+              type="datetime-local"
+              class="dash-input"
+              [(ngModel)]="startDate"
+            />
+          </div>
+          <div class="date-input-wrap">
+            <span class="date-label">Tugash:</span>
+            <input
+              type="datetime-local"
+              class="dash-input"
+              [(ngModel)]="endDate"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- C. KALIT SO'ZLAR (3 TA REJIM) -->
+      <div class="setting-group full-width">
+        <label class="group-label">3. Qaysi Kalit So'zlar Bo'yicha Tahlil Qilinsin?</label>
+        <div class="segmented-control">
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="keywordMode() === 'all'"
+            (click)="keywordMode.set('all')"
+          >
+            1. Bazadagi Barcha So'zlar ({{ _dbKeywords().length }})
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="keywordMode() === 'selected'"
+            (click)="keywordMode.set('selected')"
+          >
+            2. Bazadan Faqat Tanlanganlar
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="keywordMode() === 'custom'"
+            (click)="keywordMode.set('custom')"
+          >
+            3. Foydalanuvchi Kiritgan So'zlar
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="keywordMode() === 'none'"
+            (click)="keywordMode.set('none')"
+          >
+            Barcha Postlar (So'zsiz)
+          </button>
+        </div>
+
+        <!-- Custom Keywords Input -->
+        <div *ngIf="keywordMode() === 'custom'" class="sub-input-box">
+          <textarea
+            class="dash-textarea"
+            [(ngModel)]="customKeywordsInput"
+            placeholder="Kalit so'zlarni vergul yoki yangi qator bilan kiriting (masalan: poyezd, vagon, chipta, narx, kechikish)"
+            rows="3"
+          ></textarea>
+          <span class="input-hint">ℹ️ Ushbu so'zlar faqat qidiruv uchun ishlatiladi, bazaga doimiy saqlanmaydi</span>
+        </div>
+
+        <!-- Selected Keywords Badges Selection -->
+        <div *ngIf="keywordMode() === 'selected'" class="sub-input-box">
+          <div class="kw-search-bar">
+            <input
+              type="text"
+              class="dash-input"
+              [(ngModel)]="keywordSearchQuery"
+              placeholder="Kalit so'zni qidirish..."
+            />
+          </div>
+          <div class="keywords-chips-grid">
+            <button
+              *ngFor="let kw of filteredDbKeywords()"
+              type="button"
+              class="chip-btn"
+              [class.active]="selectedKeywordsList().includes(kw)"
+              (click)="toggleKeywordSelection(kw)"
+            >
+              {{ kw }}
+            </button>
+          </div>
+          <span class="input-hint">Tanlandi: {{ selectedKeywordsList().length }} ta kalit so'z</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skaner tugmasi -->
+    <div class="card-footer-action">
+      <button
+        class="scan-action-btn"
+        (click)="startScan()"
+        [disabled]="isScanning()"
+      >
+        <svg *ngIf="!isScanning()" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <svg *ngIf="isScanning()" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>{{ isScanning() ? 'Telegram Postlari Skanerlanmoqda...' : 'Vaqt Oralig\'ini Tahlil Qilish' }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. NATIJALAR PANELI -->
+  <div *ngIf="hasScanned()" class="results-card">
+    <div class="results-topbar">
+      <div class="results-stats">
+        <h3 class="results-title">Skanerlash Natijalari</h3>
+        <div class="stats-pills">
+          <span class="stat-pill total">Topildi: {{ posts().length }} ta post</span>
+          <span class="stat-pill unsent">🟡 Yuborilmagan: {{ unsentCount() }} ta</span>
+          <span class="stat-pill sent">🟢 Yuborilgan: {{ sentCount() }} ta</span>
+          <span *ngIf="scanSummary()?.skippedPrivate" class="stat-pill skipped">
+            🔒 {{ scanSummary()?.skippedPrivate }} ta yopiq kanal o'tkazildi
+          </span>
+        </div>
+      </div>
+
+      <div class="results-controls">
+        <!-- Filtr -->
+        <div class="results-filter-tabs">
+          <button
+            class="tab-btn"
+            [class.active]="resultsFilter() === 'all'"
+            (click)="resultsFilter.set('all')"
+          >
+            Barchasi ({{ posts().length }})
+          </button>
+          <button
+            class="tab-btn"
+            [class.active]="resultsFilter() === 'unsent'"
+            (click)="resultsFilter.set('unsent')"
+          >
+            Yuborilmaganlar ({{ unsentCount() }})
+          </button>
+          <button
+            class="tab-btn"
+            [class.active]="resultsFilter() === 'sent'"
+            (click)="resultsFilter.set('sent')"
+          >
+            Yuborilganlar ({{ sentCount() }})
+          </button>
+        </div>
+
+        <!-- Qidiruv -->
+        <input
+          type="text"
+          class="dash-input search-input"
+          [(ngModel)]="resultsSearchQuery"
+          placeholder="Natijalar ichidan qidirish..."
+        />
+      </div>
+    </div>
+
+    <!-- Ommaviy tanlash qatori -->
+    <div class="bulk-select-bar">
+      <div class="select-actions">
+        <button class="text-action-btn" (click)="selectAllFiltered()">
+          Barchasini tanlash ({{ filteredPosts().length }})
+        </button>
+        <span class="divider">•</span>
+        <button class="text-action-btn" (click)="selectUnsentOnly()">
+          Faqat yuborilmaganlarni tanlash ({{ unsentCount() }})
+        </button>
+        <span class="divider">•</span>
+        <button *ngIf="selectedPostIds().size > 0" class="text-action-btn text-rose-400" (click)="clearSelection()">
+          Tanlovni bekor qilish
+        </button>
+      </div>
+
+      <div class="selected-badge" *ngIf="selectedPostIds().size > 0">
+        {{ selectedPostIds().size }} ta post tanlandi
+      </div>
+    </div>
+
+    <!-- Postlar ro'yxati -->
+    <div *ngIf="filteredPosts().length === 0" class="empty-results">
+      <svg class="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="empty-title">Mos keluvchi postlar topilmadi</p>
+      <p class="empty-sub">Boshqa vaqt oralig'i yoki kalit so'zlarni tanlab qayta urinib ko'ring</p>
+    </div>
+
+    <div *ngIf="filteredPosts().length > 0" class="posts-grid">
+      <div
+        *ngFor="let post of filteredPosts()"
+        class="post-card"
+        [class.selected]="selectedPostIds().has(post.uniqueId)"
+        [class.is-unsent]="!post.isAlreadySent"
+      >
+        <div class="card-left-select">
+          <input
+            type="checkbox"
+            class="post-checkbox"
+            [checked]="selectedPostIds().has(post.uniqueId)"
+            (change)="togglePostSelect(post.uniqueId)"
+          />
+        </div>
+
+        <div class="card-body">
+          <div class="post-header-line">
+            <div class="channel-info">
+              <span class="channel-title">{{ post.channelTitle }}</span>
+              <span *ngIf="post.channelUsername" class="channel-username">@{{ post.channelUsername }}</span>
+              <span class="post-time">{{ formatDate(post.date) }}</span>
+            </div>
+
+            <div class="post-badges">
+              <!-- Yuborilganlik holati -->
+              <span *ngIf="post.isAlreadySent" class="badge-status sent">
+                🟢 Yuborilgan ({{ post.existingStatus }})
+              </span>
+              <span *ngIf="!post.isAlreadySent" class="badge-status unsent">
+                🟡 Yangi / Yuborilmagan
+              </span>
+
+              <!-- Matched Keywords -->
+              <span *ngFor="let kw of post.matchedKeywords" class="badge-keyword">
+                🔍 {{ kw }}
+              </span>
+            </div>
+          </div>
+
+          <div class="post-snippet" (click)="openDetail(post)">
+            {{ post.text | slice:0:220 }}{{ post.text.length > 220 ? '...' : '' }}
+          </div>
+
+          <div class="post-footer-actions">
+            <a
+              *ngIf="post.postLink"
+              [href]="post.postLink"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link-btn"
+              (click)="$event.stopPropagation()"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+              <span>Telegramda ko'rish</span>
+            </a>
+
+            <button class="view-btn" (click)="openDetail(post)">
+              Batafsil matn
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. SUZUVCHI HARAKATLAR PANELİ (FLOATING ACTION BAR) -->
+  <div *ngIf="selectedPostIds().size > 0" class="floating-bar">
+    <div class="floating-left">
+      <div class="selection-pill">
+        <span class="count-num">{{ selectedPostIds().size }}</span>
+        <span>ta post tanlandi</span>
+      </div>
+    </div>
+
+    <div class="floating-actions">
+      <button class="btn-cancel" (click)="clearSelection()">
+        Bekor qilish
+      </button>
+
+      <button class="btn-forward" (click)="openForwardModal()">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+        <span>Guruhga / Chatga Yo'naltirish (Forward)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 4. YO'NALTIRISH (FORWARD) MODAL OYNASI -->
+  <div *ngIf="forwardModalOpen()" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">Tanlangan {{ selectedPostIds().size }} ta postni yo'naltirish</h3>
+        <button class="modal-close-btn" (click)="forwardModalOpen.set(false)">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-section">
+          <label class="modal-label">Manzil turini tanlang:</label>
+          <div class="segmented-control">
+            <button
+              type="button"
+              class="seg-btn"
+              [class.active]="forwardTargetType() === 'groupType'"
+              (click)="forwardTargetType.set('groupType')"
+            >
+              Mavjud Tizim Guruhlariga
+            </button>
+            <button
+              type="button"
+              class="seg-btn"
+              [class.active]="forwardTargetType() === 'customTarget'"
+              (click)="forwardTargetType.set('customTarget')"
+            >
+              Ixtiyoriy Chat / Username
+            </button>
+          </div>
+        </div>
+
+        <!-- Option 1: Group Type -->
+        <div *ngIf="forwardTargetType() === 'groupType'" class="modal-section">
+          <label class="modal-label">Qaysi toifa guruhlariga yo'naltirilsin?</label>
+          <div class="group-type-cards">
+            <div
+              class="group-card"
+              [class.active]="selectedGroupType() === 'GOOD'"
+              (click)="selectedGroupType.set('GOOD')"
+            >
+              <div class="icon-circle good">🟢</div>
+              <div>
+                <span class="group-card-title">YAXSHI (Good) Guruhi</span>
+                <span class="group-card-sub">Ijobiy yangiliklar guruhi</span>
+              </div>
+            </div>
+
+            <div
+              class="group-card"
+              [class.active]="selectedGroupType() === 'BAD'"
+              (click)="selectedGroupType.set('BAD')"
+            >
+              <div class="icon-circle bad">🔴</div>
+              <div>
+                <span class="group-card-title">YOMON (Bad) Guruhi</span>
+                <span class="group-card-sub">Salbiy / Muammoli postlar guruhi</span>
+              </div>
+            </div>
+
+            <div
+              class="group-card"
+              [class.active]="selectedGroupType() === 'NEUTRAL'"
+              (click)="selectedGroupType.set('NEUTRAL')"
+            >
+              <div class="icon-circle neutral">⚪</div>
+              <div>
+                <span class="group-card-title">NEYTRAL (Neutral) Guruhi</span>
+                <span class="group-card-sub">Neytral xabarlar guruhi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option 2: Custom Target -->
+        <div *ngIf="forwardTargetType() === 'customTarget'" class="modal-section">
+          <label class="modal-label">Ixtiyoriy Chat ID yoki @username kiriting:</label>
+          <input
+            type="text"
+            class="dash-input"
+            [(ngModel)]="customTargetInput"
+            placeholder="Masalan: -100123456789 yoki @menejer_chat"
+          />
+          <span class="input-hint">ℹ️ Bot bu guruh/chatda a'zo bo'lishi yoki xabar yuborish ruxsati bo'lishi lozim</span>
+        </div>
+
+        <div *ngIf="forwardResult()" class="result-alert" [class.success]="forwardResult()?.success" [class.error]="!forwardResult()?.success">
+          {{ forwardResult()?.message }}
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="forwardModalOpen.set(false)" [disabled]="isForwarding()">
+          Bekor qilish
+        </button>
+        <button class="btn-primary" (click)="submitForward()" [disabled]="isForwarding()">
+          <span *ngIf="isForwarding()" class="spinner"></span>
+          <span>{{ isForwarding() ? 'Yo\'naltirilmoqda...' : 'Tasdiqlash va Yuborish' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. BATAFSIL MATN MODALI -->
+  <div *ngIf="detailModalOpen() && detailPost()" class="modal-backdrop">
+    <div class="modal-container detail-modal">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">{{ detailPost()?.channelTitle }}</h3>
+          <span class="modal-sub">{{ formatDate(detailPost()?.date || '') }}</span>
+        </div>
+        <button class="modal-close-btn" (click)="detailModalOpen.set(false)">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-text-box">
+          {{ detailPost()?.text }}
+        </div>
+
+        <div class="detail-meta-box">
+          <div class="meta-row">
+            <span class="meta-label">Status:</span>
+            <span>{{ detailPost()?.isAlreadySent ? '🟢 Avval yuborilgan' : '🟡 Hali yuborilmagan' }}</span>
+          </div>
+          <div class="meta-row" *ngIf="detailPost()?.matchedKeywords?.length">
+            <span class="meta-label">Kalit so'zlar:</span>
+            <span>{{ detailPost()?.matchedKeywords?.join(', ') }}</span>
+          </div>
+          <div class="meta-row" *ngIf="detailPost()?.postLink">
+            <span class="meta-label">Havola:</span>
+            <a [href]="detailPost()?.postLink" target="_blank" class="text-blue-400 underline">
+              {{ detailPost()?.postLink }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" (click)="detailModalOpen.set(false)">
+          Yopish
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

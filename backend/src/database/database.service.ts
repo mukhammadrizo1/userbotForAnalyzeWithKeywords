@@ -327,6 +327,23 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return res.rows.length > 0 ? res.rows[0] : null;
   }
 
+  async getHistoryItemsMap(uniqueIds: string[]): Promise<Map<string, any>> {
+    const map = new Map<string, any>();
+    if (!uniqueIds || uniqueIds.length === 0) return map;
+    try {
+      const res = await this.query(
+        'SELECT msg_unique_id, date_added, text, sentiment, channel, status, error_message, post_link, raw_chat_id, raw_msg_id FROM history WHERE msg_unique_id = ANY($1)',
+        [uniqueIds],
+      );
+      for (const row of res.rows) {
+        map.set(row.msg_unique_id, row);
+      }
+    } catch (err: any) {
+      console.error('getHistoryItemsMap xatosi:', err?.message || err);
+    }
+    return map;
+  }
+
   async deleteHistoryItem(uniqueId: string): Promise<boolean> {
     const res = await this.query('DELETE FROM history WHERE msg_unique_id = $1', [uniqueId]);
     return (res.rowCount ?? 0) > 0;

@@ -105,6 +105,19 @@
 
     <button
       class="nav-item"
+      [class.active]="activeSection === 'inspector'"
+      (click)="selectSection('inspector')"
+      [title]="collapsed ? 'Vaqt Oralig\'i Tahlili' : ''"
+    >
+      <svg class="nav-icon text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span *ngIf="!collapsed" class="nav-label">Vaqt Oralig'i</span>
+      <span *ngIf="!collapsed" class="nav-badge" style="color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Audit</span>
+    </button>
+
+    <button
+      class="nav-item"
       [class.active]="activeSection === 'logs'"
       (click)="selectSection('logs')"
       [title]="collapsed ? 'Jonli Loglar' : ''"
