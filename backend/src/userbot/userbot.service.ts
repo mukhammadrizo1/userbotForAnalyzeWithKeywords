@@ -1453,11 +1453,20 @@ Javob faqat bitta so'z bo'lsin.`;
 
       let entity: any = null;
       try {
-        entity = await this.client.getEntity(cleanInput);
+        const cached = this.channelCache.get(cleanInput) ||
+          this.channelCache.get(`@${cleanInput}`) ||
+          this.channelCache.get(cleanInput.toLowerCase());
+
+        const lookupTarget = cached?.markedId || cached?.id || cleanInput;
+        entity = await this.client.getEntity(lookupTarget);
       } catch (err: any) {
-        // Could be private or inaccessible without joining, skip gracefully
-        skippedPrivateCount++;
-        continue;
+        // If cached id failed, fallback to cleanInput once
+        try {
+          entity = await this.client.getEntity(cleanInput);
+        } catch {
+          skippedPrivateCount++;
+          continue;
+        }
       }
 
       if (!entity) continue;
@@ -1526,7 +1535,7 @@ Javob faqat bitta so'z bo'lsin.`;
       }
 
       // Small throttle delay between channels to avoid FloodWait
-      await new Promise((r) => setTimeout(r, 80));
+      await new Promise((r) => setTimeout(r, 180));
     }
 
     // Cross-reference with DB to check if already sent
