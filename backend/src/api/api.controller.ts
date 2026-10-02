@@ -202,6 +202,12 @@ export class ApiController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('inspector/analyze')
+  async analyzeInspectedPosts(@Body() body: any): Promise<any> {
+    return this.userbot.analyzeInspectedPosts(body?.posts || []);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('system/mode')
   async getSystemMode(): Promise<any> {
     return this.userbot.getSystemMode();

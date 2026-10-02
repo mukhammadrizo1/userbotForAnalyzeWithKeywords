@@ -116,6 +116,10 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/inspector/forward`, payload);
   }
 
+  analyzeInspectedPosts(posts: Array<{ uniqueId: string; text: string }>): Observable<any> {
+    return this.http.post<any>(`${this.base}/inspector/analyze`, { posts });
+  }
+
   getSystemMode(): Observable<any> {
     return this.http.get<any>(`${this.base}/system/mode`);
   }

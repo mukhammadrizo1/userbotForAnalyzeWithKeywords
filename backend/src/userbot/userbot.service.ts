@@ -1570,6 +1570,22 @@ Javob faqat bitta so'z bo'lsin.`;
     };
   }
 
+  async analyzeInspectedPosts(posts: Array<{ uniqueId: string; text: string }>): Promise<any> {
+    if (!posts || posts.length === 0) {
+      return { success: false, error: 'Tahlil uchun postlar tanlanmagan' };
+    }
+    const results: Record<string, { sentiment: string; error?: string }> = {};
+    for (const post of posts) {
+      try {
+        const sentiment = await this.analyzeContentSmart(post.text.slice(0, 2000));
+        results[post.uniqueId] = { sentiment };
+      } catch (err: any) {
+        results[post.uniqueId] = { sentiment: 'ERROR', error: err?.message || String(err) };
+      }
+    }
+    return { success: true, results };
+  }
+
   async forwardInspectedPosts(options: {
     posts: Array<{
       rawChatId: string;
@@ -1581,7 +1597,9 @@ Javob faqat bitta so'z bo'lsin.`;
     }>;
     targetMode: 'groupType' | 'customTarget';
     groupType?: 'GOOD' | 'BAD' | 'NEUTRAL';
+    groupTypes?: string[];
     customTarget?: string;
+    customTargets?: string;
     markAsSentInDb?: boolean;
   }): Promise<any> {
     if (!this.client || !this.isConnected) {
@@ -1594,17 +1612,32 @@ Javob faqat bitta so'z bo'lsin.`;
 
     let destinations: string[] = [];
     if (options.targetMode === 'groupType') {
-      const type = (options.groupType || 'GOOD').toLowerCase();
-      const groups = await this.db.getGroups(type);
-      destinations = groups.map((g) => g.group_id);
+      const types = options.groupTypes && options.groupTypes.length > 0
+        ? options.groupTypes
+        : [options.groupType || 'GOOD'];
+      for (const t of types) {
+        const groups = await this.db.getGroups(t.toLowerCase());
+        for (const g of groups) {
+          if (!destinations.includes(g.group_id)) {
+            destinations.push(g.group_id);
+          }
+        }
+      }
       if (destinations.length === 0) {
-        return { success: false, error: `"${options.groupType}" toifasi uchun birorta ham guruh topilmadi` };
+        return { success: false, error: 'Tanlangan toifalar uchun birorta ham guruh topilmadi' };
       }
     } else if (options.targetMode === 'customTarget') {
-      if (!options.customTarget || !options.customTarget.trim()) {
+      const raw = options.customTargets || options.customTarget || '';
+      if (!raw.trim()) {
         return { success: false, error: 'Ixtiyoriy chat ID yoki username kiritilmadi' };
       }
-      destinations = [options.customTarget.trim()];
+      destinations = raw
+        .split(/[\n,]+/)
+        .map((x: string) => x.trim())
+        .filter((x: string) => x.length > 0);
+      if (destinations.length === 0) {
+        return { success: false, error: 'To\'g\'ri chat ID yoki username kiritilmadi' };
+      }
     }
 
     let forwardedCount = 0;

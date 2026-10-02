@@ -15,6 +15,8 @@ import { LogsComponent } from './components/logs/logs.component';
 import { TesterComponent } from './components/tester/tester.component';
 import { InspectorComponent } from './components/inspector/inspector.component';
 
+import { I18nService, Language } from '../../core/i18n.service';
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -53,7 +55,12 @@ export class DashboardComponent implements OnInit {
   constructor(
     private api: ApiService,
     private auth: AuthService,
+    public i18n: I18nService,
   ) {}
+
+  switchLang(lang: Language): void {
+    this.i18n.setLanguage(lang);
+  }
 
   ngOnInit(): void {
     this.loadStatus();

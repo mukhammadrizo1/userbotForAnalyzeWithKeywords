@@ -3,20 +3,20 @@
   <div class="filter-card">
     <div class="card-header">
       <div class="header-icon-box">
-        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        <svg class="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
       </div>
       <div>
-        <h2 class="card-title">Vaqt Oralig'i Tahlili (Historical Range Inspector)</h2>
-        <p class="card-subtitle">Telegram kanallaridagi o'tmishdagi postlarni vaqt va kalit so'zlar bo'yicha tahlil qilish hamda qayta yo'naltirish</p>
+        <h2 class="card-title">{{ i18n.t('inspector.title') }}</h2>
+        <p class="card-subtitle">{{ i18n.t('inspector.subtitle') }}</p>
       </div>
     </div>
 
     <div class="settings-grid">
       <!-- A. QAYSI KANALLAR -->
       <div class="setting-group">
-        <label class="group-label">1. Qaysi Kanallarni Tekshirish?</label>
+        <label class="group-label">{{ i18n.t('inspector.channels_label') }}</label>
         <div class="segmented-control">
           <button
             type="button"
@@ -24,7 +24,7 @@
             [class.active]="channelScope() === 'all'"
             (click)="channelScope.set('all')"
           >
-            Barcha Kanallar ({{ _dbChannels().length }})
+            {{ i18n.t('inspector.channels_all') }} ({{ _dbChannels().length }})
           </button>
           <button
             type="button"
@@ -32,7 +32,7 @@
             [class.active]="channelScope() === 'selected'"
             (click)="channelScope.set('selected')"
           >
-            Tanlangan Kanallar
+            {{ i18n.t('inspector.channels_selected') }}
           </button>
           <button
             type="button"
@@ -40,7 +40,7 @@
             [class.active]="channelScope() === 'custom'"
             (click)="channelScope.set('custom')"
           >
-            Maxsus Kanal
+            {{ i18n.t('inspector.channels_custom') }}
           </button>
         </div>
 
@@ -50,9 +50,9 @@
             type="text"
             class="dash-input"
             [(ngModel)]="customChannelInput"
-            placeholder="Kanal username yoki havolasi (masalan: @gazetauz yoki https://t.me/daryo)"
+            [placeholder]="i18n.t('inspector.custom_channel_ph')"
           />
-          <span class="input-hint">ℹ️ Begona ommaviy kanallarni ham a'zo bo'lmasdan tekshira oladi</span>
+          <span class="input-hint">{{ i18n.t('inspector.public_hint') }}</span>
         </div>
 
         <!-- Selected Channels Multi-select Chips -->
@@ -68,13 +68,22 @@
               {{ ch.title || ch.username || ch.ident }}
             </button>
           </div>
-          <span class="input-hint">Tanlandi: {{ selectedChannelIdents().length }} ta kanal</span>
+          <span class="input-hint">Tanlandi: {{ selectedChannelIdents().length }} ta</span>
         </div>
       </div>
 
       <!-- B. VAQT ORALIG'I -->
       <div class="setting-group">
-        <label class="group-label">2. Vaqt Oralig'i (Date Range)</label>
+        <div class="flex-between">
+          <label class="group-label">{{ i18n.t('inspector.range_label') }}</label>
+          <span class="tz-badge">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>UTC+5 (Toshkent)</span>
+          </span>
+        </div>
+
         <div class="preset-buttons">
           <button
             type="button"
@@ -82,7 +91,7 @@
             [class.active]="presetRange() === '3h'"
             (click)="applyPreset('3h')"
           >
-            Oxirgi 3 soat
+            {{ i18n.t('inspector.range_3h') }}
           </button>
           <button
             type="button"
@@ -90,7 +99,7 @@
             [class.active]="presetRange() === 'today'"
             (click)="applyPreset('today')"
           >
-            Bugun
+            {{ i18n.t('inspector.range_today') }}
           </button>
           <button
             type="button"
@@ -98,7 +107,7 @@
             [class.active]="presetRange() === '24h'"
             (click)="applyPreset('24h')"
           >
-            Oxirgi 24 soat
+            {{ i18n.t('inspector.range_24h') }}
           </button>
           <button
             type="button"
@@ -106,7 +115,7 @@
             [class.active]="presetRange() === '3d'"
             (click)="applyPreset('3d')"
           >
-            Oxirgi 3 kun
+            {{ i18n.t('inspector.range_3d') }}
           </button>
           <button
             type="button"
@@ -114,33 +123,37 @@
             [class.active]="presetRange() === 'custom'"
             (click)="presetRange.set('custom')"
           >
-            Maxsus sana
+            {{ i18n.t('inspector.range_custom') }}
           </button>
         </div>
 
-        <div class="date-pickers-row">
+        <div class="date-pickers-row styled-pickers">
           <div class="date-input-wrap">
-            <span class="date-label">Boshlanish:</span>
-            <input
-              type="datetime-local"
-              class="dash-input"
-              [(ngModel)]="startDate"
-            />
+            <span class="date-label">{{ i18n.t('inspector.start_date') }}</span>
+            <div class="input-icon-wrap">
+              <input
+                type="datetime-local"
+                class="dash-input datetime-picker"
+                [(ngModel)]="startDate"
+              />
+            </div>
           </div>
           <div class="date-input-wrap">
-            <span class="date-label">Tugash:</span>
-            <input
-              type="datetime-local"
-              class="dash-input"
-              [(ngModel)]="endDate"
-            />
+            <span class="date-label">{{ i18n.t('inspector.end_date') }}</span>
+            <div class="input-icon-wrap">
+              <input
+                type="datetime-local"
+                class="dash-input datetime-picker"
+                [(ngModel)]="endDate"
+              />
+            </div>
           </div>
         </div>
       </div>
 
       <!-- C. KALIT SO'ZLAR (3 TA REJIM) -->
       <div class="setting-group full-width">
-        <label class="group-label">3. Qaysi Kalit So'zlar Bo'yicha Tahlil Qilinsin?</label>
+        <label class="group-label">{{ i18n.t('inspector.kw_label') }}</label>
         <div class="segmented-control">
           <button
             type="button"
@@ -148,7 +161,7 @@
             [class.active]="keywordMode() === 'all'"
             (click)="keywordMode.set('all')"
           >
-            1. Bazadagi Barcha So'zlar ({{ _dbKeywords().length }})
+            {{ i18n.t('inspector.kw_all') }} ({{ _dbKeywords().length }})
           </button>
           <button
             type="button"
@@ -156,7 +169,7 @@
             [class.active]="keywordMode() === 'selected'"
             (click)="keywordMode.set('selected')"
           >
-            2. Bazadan Faqat Tanlanganlar
+            {{ i18n.t('inspector.kw_selected') }}
           </button>
           <button
             type="button"
@@ -164,7 +177,7 @@
             [class.active]="keywordMode() === 'custom'"
             (click)="keywordMode.set('custom')"
           >
-            3. Foydalanuvchi Kiritgan So'zlar
+            {{ i18n.t('inspector.kw_custom') }}
           </button>
           <button
             type="button"
@@ -172,7 +185,7 @@
             [class.active]="keywordMode() === 'none'"
             (click)="keywordMode.set('none')"
           >
-            Barcha Postlar (So'zsiz)
+            {{ i18n.t('inspector.kw_none') }}
           </button>
         </div>
 
@@ -181,10 +194,10 @@
           <textarea
             class="dash-textarea"
             [(ngModel)]="customKeywordsInput"
-            placeholder="Kalit so'zlarni vergul yoki yangi qator bilan kiriting (masalan: poyezd, vagon, chipta, narx, kechikish)"
+            [placeholder]="i18n.t('inspector.kw_custom_ph')"
             rows="3"
           ></textarea>
-          <span class="input-hint">ℹ️ Ushbu so'zlar faqat qidiruv uchun ishlatiladi, bazaga doimiy saqlanmaydi</span>
+          <span class="input-hint">{{ i18n.t('inspector.kw_custom_hint') }}</span>
         </div>
 
         <!-- Selected Keywords Badges Selection -->
@@ -194,7 +207,7 @@
               type="text"
               class="dash-input"
               [(ngModel)]="keywordSearchQuery"
-              placeholder="Kalit so'zni qidirish..."
+              [placeholder]="i18n.t('inspector.kw_search_ph')"
             />
           </div>
           <div class="keywords-chips-grid">
@@ -208,7 +221,7 @@
               {{ kw }}
             </button>
           </div>
-          <span class="input-hint">Tanlandi: {{ selectedKeywordsList().length }} ta kalit so'z</span>
+          <span class="input-hint">Tanlandi: {{ selectedKeywordsList().length }} ta</span>
         </div>
       </div>
     </div>
@@ -226,7 +239,7 @@
         <svg *ngIf="isScanning()" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
-        <span>{{ isScanning() ? 'Telegram Postlari Skanerlanmoqda...' : 'Vaqt Oralig\'ini Tahlil Qilish' }}</span>
+        <span>{{ isScanning() ? i18n.t('inspector.btn_scanning') : i18n.t('inspector.btn_scan') }}</span>
       </button>
     </div>
   </div>
@@ -235,13 +248,13 @@
   <div *ngIf="hasScanned()" class="results-card">
     <div class="results-topbar">
       <div class="results-stats">
-        <h3 class="results-title">Skanerlash Natijalari</h3>
+        <h3 class="results-title">{{ i18n.t('inspector.results_title') }}</h3>
         <div class="stats-pills">
-          <span class="stat-pill total">Topildi: {{ posts().length }} ta post</span>
-          <span class="stat-pill unsent">🟡 Yuborilmagan: {{ unsentCount() }} ta</span>
-          <span class="stat-pill sent">🟢 Yuborilgan: {{ sentCount() }} ta</span>
+          <span class="stat-pill total">{{ i18n.t('inspector.stat_total') }}: {{ posts().length }}</span>
+          <span class="stat-pill unsent">🟡 {{ i18n.t('inspector.stat_unsent') }}: {{ unsentCount() }}</span>
+          <span class="stat-pill sent">🟢 {{ i18n.t('inspector.stat_sent') }}: {{ sentCount() }}</span>
           <span *ngIf="scanSummary()?.skippedPrivate" class="stat-pill skipped">
-            🔒 {{ scanSummary()?.skippedPrivate }} ta yopiq kanal o'tkazildi
+            🔒 {{ scanSummary()?.skippedPrivate }} {{ i18n.t('inspector.stat_skipped') }}
           </span>
         </div>
       </div>
@@ -254,21 +267,21 @@
             [class.active]="resultsFilter() === 'all'"
             (click)="resultsFilter.set('all')"
           >
-            Barchasi ({{ posts().length }})
+            {{ i18n.t('inspector.tab_all') }} ({{ posts().length }})
           </button>
           <button
             class="tab-btn"
             [class.active]="resultsFilter() === 'unsent'"
             (click)="resultsFilter.set('unsent')"
           >
-            Yuborilmaganlar ({{ unsentCount() }})
+            {{ i18n.t('inspector.tab_unsent') }} ({{ unsentCount() }})
           </button>
           <button
             class="tab-btn"
             [class.active]="resultsFilter() === 'sent'"
             (click)="resultsFilter.set('sent')"
           >
-            Yuborilganlar ({{ sentCount() }})
+            {{ i18n.t('inspector.tab_sent') }} ({{ sentCount() }})
           </button>
         </div>
 
@@ -277,7 +290,7 @@
           type="text"
           class="dash-input search-input"
           [(ngModel)]="resultsSearchQuery"
-          placeholder="Natijalar ichidan qidirish..."
+          [placeholder]="i18n.t('inspector.search_results_ph')"
         />
       </div>
     </div>
@@ -286,32 +299,33 @@
     <div class="bulk-select-bar">
       <div class="select-actions">
         <button class="text-action-btn" (click)="selectAllFiltered()">
-          Barchasini tanlash ({{ filteredPosts().length }})
+          {{ i18n.t('inspector.select_all') }} ({{ filteredPosts().length }})
         </button>
         <span class="divider">•</span>
         <button class="text-action-btn" (click)="selectUnsentOnly()">
-          Faqat yuborilmaganlarni tanlash ({{ unsentCount() }})
+          {{ i18n.t('inspector.select_unsent') }} ({{ unsentCount() }})
         </button>
         <span class="divider">•</span>
         <button *ngIf="selectedPostIds().size > 0" class="text-action-btn text-rose-400" (click)="clearSelection()">
-          Tanlovni bekor qilish
+          {{ i18n.t('inspector.clear_select') }}
         </button>
       </div>
 
       <div class="selected-badge" *ngIf="selectedPostIds().size > 0">
-        {{ selectedPostIds().size }} ta post tanlandi
+        {{ selectedPostIds().size }} {{ i18n.t('inspector.selected_posts') }}
       </div>
     </div>
 
-    <!-- Postlar ro'yxati -->
+    <!-- Bo'sh holat -->
     <div *ngIf="filteredPosts().length === 0" class="empty-results">
       <svg class="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
-      <p class="empty-title">Mos keluvchi postlar topilmadi</p>
-      <p class="empty-sub">Boshqa vaqt oralig'i yoki kalit so'zlarni tanlab qayta urinib ko'ring</p>
+      <p class="empty-title">{{ i18n.t('inspector.empty_title') }}</p>
+      <p class="empty-sub">{{ i18n.t('inspector.empty_sub') }}</p>
     </div>
 
+    <!-- Postlar ro'yxati -->
     <div *ngIf="filteredPosts().length > 0" class="posts-grid">
       <div
         *ngFor="let post of filteredPosts()"
@@ -339,24 +353,53 @@
             <div class="post-badges">
               <!-- Yuborilganlik holati -->
               <span *ngIf="post.isAlreadySent" class="badge-status sent">
-                🟢 Yuborilgan ({{ post.existingStatus }})
+                🟢 {{ post.existingStatus }}
               </span>
               <span *ngIf="!post.isAlreadySent" class="badge-status unsent">
-                🟡 Yangi / Yuborilmagan
+                🟡 {{ i18n.t('inspector.stat_unsent') }}
               </span>
 
-              <!-- Matched Keywords -->
-              <span *ngFor="let kw of post.matchedKeywords" class="badge-keyword">
-                🔍 {{ kw }}
+              <!-- AI Xulosa belgisi (agar tahlil qilingan bo'lsa) -->
+              <span *ngIf="post.aiSentiment" class="badge-ai-sentiment" [ngClass]="post.aiSentiment.toLowerCase()">
+                🤖 AI: {{ post.aiSentiment }}
               </span>
             </div>
           </div>
 
+          <!-- ANIQ KALIT SO'ZLAR QATORI -->
+          <div class="matched-keywords-row">
+            <span class="kw-label-prefix">{{ i18n.t('inspector.matched_kw') }}</span>
+            <div *ngIf="post.matchedKeywords && post.matchedKeywords.length > 0" class="kw-tags-list">
+              <span *ngFor="let kw of post.matchedKeywords" class="matched-kw-badge">
+                🎯 {{ kw }}
+              </span>
+            </div>
+            <span *ngIf="!post.matchedKeywords || post.matchedKeywords.length === 0" class="no-kw-note">
+              {{ i18n.t('inspector.no_kw_filter') }}
+            </span>
+          </div>
+
+          <!-- Snippet matn -->
           <div class="post-snippet" (click)="openDetail(post)">
-            {{ post.text | slice:0:220 }}{{ post.text.length > 220 ? '...' : '' }}
+            {{ post.text | slice:0:240 }}{{ post.text.length > 240 ? '...' : '' }}
           </div>
 
           <div class="post-footer-actions">
+            <!-- AI Tahlil tugmasi (individual) -->
+            <button
+              class="btn-action-sm ai-btn"
+              (click)="analyzeSinglePost(post, $event)"
+              [disabled]="post.aiAnalyzing"
+              title="Postni Groq AI orqali mustaqil tahlil qilish"
+            >
+              <svg *ngIf="!post.aiAnalyzing" class="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              <span *ngIf="post.aiAnalyzing" class="spinner-sm"></span>
+              <span>{{ post.aiAnalyzing ? i18n.t('inspector.btn_ai_analyzing') : (post.aiSentiment ? 'Qayta AI Tahlil' : i18n.t('inspector.btn_ai_analyze')) }}</span>
+            </button>
+
+            <!-- Telegram havola -->
             <a
               *ngIf="post.postLink"
               [href]="post.postLink"
@@ -368,11 +411,11 @@
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
               </svg>
-              <span>Telegramda ko'rish</span>
+              <span>{{ i18n.t('inspector.tg_view') }}</span>
             </a>
 
             <button class="view-btn" (click)="openDetail(post)">
-              Batafsil matn
+              {{ i18n.t('inspector.details') }}
             </button>
           </div>
         </div>
@@ -380,25 +423,39 @@
     </div>
   </div>
 
-  <!-- 3. SUZUVCHI HARAKATLAR PANELİ (FLOATING ACTION BAR) -->
+  <!-- 3. SUZUVCHI HARAKATLAR PANELI (FLOATING ACTION BAR) -->
   <div *ngIf="selectedPostIds().size > 0" class="floating-bar">
     <div class="floating-left">
       <div class="selection-pill">
         <span class="count-num">{{ selectedPostIds().size }}</span>
-        <span>ta post tanlandi</span>
+        <span>{{ i18n.t('inspector.selected_posts') }}</span>
       </div>
     </div>
 
     <div class="floating-actions">
-      <button class="btn-cancel" (click)="clearSelection()">
-        Bekor qilish
+      <!-- Ommaviy AI Tahlil tugmasi -->
+      <button
+        class="btn-bulk-ai"
+        (click)="analyzeBulkSelectedPosts()"
+        [disabled]="isBulkAnalyzing()"
+      >
+        <span *ngIf="isBulkAnalyzing()" class="spinner-sm"></span>
+        <svg *ngIf="!isBulkAnalyzing()" class="w-4 h-4 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        <span>{{ isBulkAnalyzing() ? i18n.t('inspector.btn_ai_analyzing') : i18n.t('inspector.btn_bulk_ai') }}</span>
       </button>
 
+      <!-- Guruhlarga yo'naltirish -->
       <button class="btn-forward" (click)="openForwardModal()">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
         </svg>
-        <span>Guruhga / Chatga Yo'naltirish (Forward)</span>
+        <span>{{ i18n.t('inspector.btn_bulk_forward') }}</span>
+      </button>
+
+      <button class="btn-cancel" (click)="clearSelection()">
+        {{ i18n.t('inspector.cancel') }}
       </button>
     </div>
   </div>
@@ -407,13 +464,13 @@
   <div *ngIf="forwardModalOpen()" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title">Tanlangan {{ selectedPostIds().size }} ta postni yo'naltirish</h3>
+        <h3 class="modal-title">{{ i18n.t('inspector.forward_title') }} ({{ selectedPostIds().size }} ta)</h3>
         <button class="modal-close-btn" (click)="forwardModalOpen.set(false)">✕</button>
       </div>
 
       <div class="modal-body">
         <div class="modal-section">
-          <label class="modal-label">Manzil turini tanlang:</label>
+          <label class="modal-label">{{ i18n.t('inspector.forward_target_type') }}</label>
           <div class="segmented-control">
             <button
               type="button"
@@ -421,7 +478,7 @@
               [class.active]="forwardTargetType() === 'groupType'"
               (click)="forwardTargetType.set('groupType')"
             >
-              Mavjud Tizim Guruhlariga
+              {{ i18n.t('inspector.target_groups') }}
             </button>
             <button
               type="button"
@@ -429,63 +486,66 @@
               [class.active]="forwardTargetType() === 'customTarget'"
               (click)="forwardTargetType.set('customTarget')"
             >
-              Ixtiyoriy Chat / Username
+              {{ i18n.t('inspector.target_custom') }}
             </button>
           </div>
         </div>
 
-        <!-- Option 1: Group Type -->
+        <!-- Option 1: Multi Group Types Selection -->
         <div *ngIf="forwardTargetType() === 'groupType'" class="modal-section">
-          <label class="modal-label">Qaysi toifa guruhlariga yo'naltirilsin?</label>
+          <label class="modal-label">{{ i18n.t('inspector.select_groups_label') }}</label>
           <div class="group-type-cards">
             <div
               class="group-card"
-              [class.active]="selectedGroupType() === 'GOOD'"
-              (click)="selectedGroupType.set('GOOD')"
+              [class.active]="selectedGroupTypes().includes('GOOD')"
+              (click)="toggleGroupType('GOOD')"
             >
+              <input type="checkbox" [checked]="selectedGroupTypes().includes('GOOD')" class="mr-2" />
               <div class="icon-circle good">🟢</div>
               <div>
-                <span class="group-card-title">YAXSHI (Good) Guruhi</span>
-                <span class="group-card-sub">Ijobiy yangiliklar guruhi</span>
+                <span class="group-card-title">YAXSHI (Good)</span>
+                <span class="group-card-sub">Ijobiy yangiliklar guruhlari</span>
               </div>
             </div>
 
             <div
               class="group-card"
-              [class.active]="selectedGroupType() === 'BAD'"
-              (click)="selectedGroupType.set('BAD')"
+              [class.active]="selectedGroupTypes().includes('BAD')"
+              (click)="toggleGroupType('BAD')"
             >
+              <input type="checkbox" [checked]="selectedGroupTypes().includes('BAD')" class="mr-2" />
               <div class="icon-circle bad">🔴</div>
               <div>
-                <span class="group-card-title">YOMON (Bad) Guruhi</span>
-                <span class="group-card-sub">Salbiy / Muammoli postlar guruhi</span>
+                <span class="group-card-title">YOMON (Bad)</span>
+                <span class="group-card-sub">Salbiy / Muammoli postlar guruhlari</span>
               </div>
             </div>
 
             <div
               class="group-card"
-              [class.active]="selectedGroupType() === 'NEUTRAL'"
-              (click)="selectedGroupType.set('NEUTRAL')"
+              [class.active]="selectedGroupTypes().includes('NEUTRAL')"
+              (click)="toggleGroupType('NEUTRAL')"
             >
+              <input type="checkbox" [checked]="selectedGroupTypes().includes('NEUTRAL')" class="mr-2" />
               <div class="icon-circle neutral">⚪</div>
               <div>
-                <span class="group-card-title">NEYTRAL (Neutral) Guruhi</span>
-                <span class="group-card-sub">Neytral xabarlar guruhi</span>
+                <span class="group-card-title">NEYTRAL (Neutral)</span>
+                <span class="group-card-sub">Neytral xabarlar guruhlari</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Option 2: Custom Target -->
+        <!-- Option 2: Multi Custom Targets Input -->
         <div *ngIf="forwardTargetType() === 'customTarget'" class="modal-section">
-          <label class="modal-label">Ixtiyoriy Chat ID yoki @username kiriting:</label>
-          <input
-            type="text"
-            class="dash-input"
-            [(ngModel)]="customTargetInput"
-            placeholder="Masalan: -100123456789 yoki @menejer_chat"
-          />
-          <span class="input-hint">ℹ️ Bot bu guruh/chatda a'zo bo'lishi yoki xabar yuborish ruxsati bo'lishi lozim</span>
+          <label class="modal-label">{{ i18n.t('inspector.custom_targets_label') }}</label>
+          <textarea
+            class="dash-textarea"
+            [(ngModel)]="customTargetsInput"
+            [placeholder]="i18n.t('inspector.custom_targets_ph')"
+            rows="3"
+          ></textarea>
+          <span class="input-hint">{{ i18n.t('inspector.custom_targets_hint') }}</span>
         </div>
 
         <div *ngIf="forwardResult()" class="result-alert" [class.success]="forwardResult()?.success" [class.error]="!forwardResult()?.success">
@@ -495,11 +555,11 @@
 
       <div class="modal-footer">
         <button class="btn-cancel" (click)="forwardModalOpen.set(false)" [disabled]="isForwarding()">
-          Bekor qilish
+          {{ i18n.t('inspector.cancel') }}
         </button>
         <button class="btn-primary" (click)="submitForward()" [disabled]="isForwarding()">
-          <span *ngIf="isForwarding()" class="spinner"></span>
-          <span>{{ isForwarding() ? 'Yo\'naltirilmoqda...' : 'Tasdiqlash va Yuborish' }}</span>
+          <span *ngIf="isForwarding()" class="spinner-sm"></span>
+          <span>{{ isForwarding() ? i18n.t('inspector.btn_sending') : i18n.t('inspector.btn_confirm_send') }}</span>
         </button>
       </div>
     </div>
@@ -511,7 +571,7 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">{{ detailPost()?.channelTitle }}</h3>
-          <span class="modal-sub">{{ formatDate(detailPost()?.date || '') }}</span>
+          <span class="modal-sub">{{ formatDate(detailPost()?.date || '') }} (Toshkent vaqti)</span>
         </div>
         <button class="modal-close-btn" (click)="detailModalOpen.set(false)">✕</button>
       </div>
@@ -528,7 +588,11 @@
           </div>
           <div class="meta-row" *ngIf="detailPost()?.matchedKeywords?.length">
             <span class="meta-label">Kalit so'zlar:</span>
-            <span>{{ detailPost()?.matchedKeywords?.join(', ') }}</span>
+            <span class="text-cyan-300 font-semibold">{{ detailPost()?.matchedKeywords?.join(', ') }}</span>
+          </div>
+          <div class="meta-row" *ngIf="detailPost()?.aiSentiment">
+            <span class="meta-label">AI Xulosa:</span>
+            <span class="font-bold">{{ detailPost()?.aiSentiment }}</span>
           </div>
           <div class="meta-row" *ngIf="detailPost()?.postLink">
             <span class="meta-label">Havola:</span>
@@ -541,7 +605,7 @@
 
       <div class="modal-footer">
         <button class="btn-primary" (click)="detailModalOpen.set(false)">
-          Yopish
+          {{ i18n.t('inspector.close') }}
         </button>
       </div>
     </div>

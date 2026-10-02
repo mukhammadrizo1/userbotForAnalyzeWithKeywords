@@ -2,6 +2,7 @@ import { Component, Input, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/api.service';
+import { I18nService } from '../../../../core/i18n.service';
 
 export interface InspectedPost {
   uniqueId: string;
@@ -18,15 +19,14 @@ export interface InspectedPost {
   existingStatus?: string;
   existingSentiment?: string;
   mediaType?: string;
+  aiSentiment?: string;
+  aiAnalyzing?: boolean;
 }
 
 @Component({
   selector: 'app-inspector',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-  ],
+  imports: [CommonModule, FormsModule],
   templateUrl: './inspector.component.html',
   styleUrl: './inspector.component.css',
 })
@@ -66,11 +66,14 @@ export class InspectorComponent implements OnInit {
   resultsSearchQuery = signal<string>('');
   selectedPostIds = signal<Set<string>>(new Set());
 
+  // AI tahlil holati
+  isBulkAnalyzing = signal<boolean>(false);
+
   // Modal oynalar
   forwardModalOpen = signal<boolean>(false);
   forwardTargetType = signal<'groupType' | 'customTarget'>('groupType');
-  selectedGroupType = signal<'GOOD' | 'BAD' | 'NEUTRAL'>('GOOD');
-  customTargetInput = signal<string>('');
+  selectedGroupTypes = signal<string[]>(['GOOD']);
+  customTargetsInput = signal<string>('');
   isForwarding = signal<boolean>(false);
   forwardResult = signal<{ success: boolean; message: string } | null>(null);
 
@@ -110,7 +113,10 @@ export class InspectorComponent implements OnInit {
     return all.filter((k) => k.toLowerCase().includes(q));
   });
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService,
+    public i18n: I18nService,
+  ) {}
 
   ngOnInit(): void {
     this.applyPreset('24h');
@@ -171,7 +177,6 @@ export class InspectorComponent implements OnInit {
     this.selectedPostIds.set(new Set());
     this.scanSummary.set(null);
 
-    // Tayyorlash
     let customKw: string[] = [];
     if (this.keywordMode() === 'custom') {
       customKw = this.customKeywordsInput()
@@ -216,7 +221,7 @@ export class InspectorComponent implements OnInit {
     });
   }
 
-  // Tanlovlar bilan ishlash
+  // Tanlovlar
   togglePostSelect(id: string): void {
     const current = new Set(this.selectedPostIds());
     if (current.has(id)) {
@@ -241,10 +246,71 @@ export class InspectorComponent implements OnInit {
     this.selectedPostIds.set(new Set());
   }
 
+  // AI Tahlil: Bitta postni tahlil qilish
+  analyzeSinglePost(post: InspectedPost, event?: MouseEvent): void {
+    if (event) event.stopPropagation();
+    post.aiAnalyzing = true;
+    this.api.analyzeInspectedPosts([{ uniqueId: post.uniqueId, text: post.text }]).subscribe({
+      next: (res: any) => {
+        post.aiAnalyzing = false;
+        if (res.success && res.results && res.results[post.uniqueId]) {
+          post.aiSentiment = res.results[post.uniqueId].sentiment;
+        }
+      },
+      error: () => {
+        post.aiAnalyzing = false;
+      },
+    });
+  }
+
+  // AI Tahlil: Tanlangan postlarni ommaviy tahlil qilish
+  analyzeBulkSelectedPosts(): void {
+    const ids = this.selectedPostIds();
+    const selected = this.posts().filter((p) => ids.has(p.uniqueId));
+    if (selected.length === 0) return;
+
+    this.isBulkAnalyzing.set(true);
+    selected.forEach((p) => (p.aiAnalyzing = true));
+
+    const payload = selected.map((p) => ({ uniqueId: p.uniqueId, text: p.text }));
+    this.api.analyzeInspectedPosts(payload).subscribe({
+      next: (res: any) => {
+        this.isBulkAnalyzing.set(false);
+        selected.forEach((p) => (p.aiAnalyzing = false));
+        if (res.success && res.results) {
+          this.posts.update((list) =>
+            list.map((p) => {
+              if (res.results[p.uniqueId]) {
+                return { ...p, aiSentiment: res.results[p.uniqueId].sentiment };
+              }
+              return p;
+            }),
+          );
+        }
+      },
+      error: () => {
+        this.isBulkAnalyzing.set(false);
+        selected.forEach((p) => (p.aiAnalyzing = false));
+      },
+    });
+  }
+
+  // Yo'naltirish
   openForwardModal(): void {
     if (this.selectedPostIds().size === 0) return;
     this.forwardResult.set(null);
     this.forwardModalOpen.set(true);
+  }
+
+  toggleGroupType(type: string): void {
+    const current = this.selectedGroupTypes();
+    if (current.includes(type)) {
+      if (current.length > 1) {
+        this.selectedGroupTypes.set(current.filter((t) => t !== type));
+      }
+    } else {
+      this.selectedGroupTypes.set([...current, type]);
+    }
   }
 
   submitForward(): void {
@@ -265,8 +331,8 @@ export class InspectorComponent implements OnInit {
         channelTitle: p.channelTitle,
       })),
       targetMode: this.forwardTargetType(),
-      groupType: this.selectedGroupType(),
-      customTarget: this.customTargetInput().trim(),
+      groupTypes: this.selectedGroupTypes(),
+      customTargets: this.customTargetsInput().trim(),
       markAsSentInDb: true,
     };
 
@@ -274,9 +340,10 @@ export class InspectorComponent implements OnInit {
       next: (res: any) => {
         this.isForwarding.set(false);
         if (res.success) {
+          const sentWord = this.i18n.currentLang() === 'ru' ? 'постов успешно переслано!' : 'ta post muvaffaqiyatli yo\'naltirildi!';
           this.forwardResult.set({
             success: true,
-            message: `${res.forwardedCount} ta post muvaffaqiyatli yo'naltirildi!`,
+            message: `${res.forwardedCount} ${sentWord}`,
           });
           // Update status locally
           this.posts.update((list) =>
@@ -294,7 +361,7 @@ export class InspectorComponent implements OnInit {
         } else {
           this.forwardResult.set({
             success: false,
-            message: res.error || 'Yo\'naltirishda xatolik yuz berdi',
+            message: res.error || 'Xatolik yuz berdi',
           });
         }
       },
@@ -317,7 +384,9 @@ export class InspectorComponent implements OnInit {
     if (!iso) return '-';
     try {
       const d = new Date(iso);
-      return d.toLocaleString('uz-UZ', {
+      const locale = this.i18n.currentLang() === 'ru' ? 'ru-RU' : 'uz-UZ';
+      return d.toLocaleString(locale, {
+        timeZone: 'Asia/Tashkent',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',

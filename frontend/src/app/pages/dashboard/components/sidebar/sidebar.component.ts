@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { I18nService } from '../../../../core/i18n.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -19,6 +20,8 @@ export class SidebarComponent {
   @Output() logoutClick = new EventEmitter<void>();
   @Output() toggleCollapse = new EventEmitter<void>();
   @Output() closeMobile = new EventEmitter<void>();
+
+  constructor(public i18n: I18nService) {}
 
   selectSection(section: string): void {
     this.sectionChange.emit(section);
